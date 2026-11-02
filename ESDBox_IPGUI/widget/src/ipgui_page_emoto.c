@@ -19,6 +19,7 @@
  */
 
 #include "ipgui_page_emoto.h"
+#include "ipgui_emoto_shared.h"
 #include "ipgui_widget.h"
 #include "ipgui_draw_arc.h"
 #include "ipgui_draw_box_background.h"
@@ -74,6 +75,8 @@ static const char *MODE_NAME[3]       = { "ECO", "SPORT", "RAIN" };
 typedef struct {
     u8_t           inited;
     u8_t           boot_done;
+    u8_t           page;
+    u8_t           visible;
     u8_t           mode;
     u8_t           charging;
     u8_t           trip_view;      /* 0=A 1=B 2=ODO */
@@ -128,7 +131,9 @@ typedef struct {
     ipgui_widget_t *w_trip;
     ipgui_widget_t *w_nav;
     ipgui_widget_t *w_tabs;
+    ipgui_widget_t *w_navbtn;
     ipgui_widget_t *w_boot;
+    ipgui_widget_t *w_trans;
     ipgui_widget_t *pressed;
 } emoto_state_t;
 
@@ -813,11 +818,11 @@ static void top_render(ipgui_widget_t * widget, ipgui_widget_render_ctx_t * ctx)
     draw_text(surf, &open_sans_9px, "LTE", 426, 17,
               emoto_rgb(0x8A, 0x9F, 0xB6, 255), 255);
 
-    icon_sun(surf, 660, 13, emoto_rgb(0xFF, 0xB8, 0x4D, 255), 235);
-    draw_text(surf, &quicksand_medium_14px, "24C", 682, 13,
+    icon_sun(surf, 612, 13, emoto_rgb(0xFF, 0xB8, 0x4D, 255), 235);
+    draw_text(surf, &quicksand_medium_14px, "24C", 634, 13,
               emoto_rgb(0xD8, 0xE4, 0xF2, 255), 240);
 
-    icon_headlight(surf, 746, 13,
+    icon_headlight(surf, 692, 13,
                    g.high_beam ? emoto_rgb(0x5B, 0x8C, 0xFF, 255)
                                : emoto_rgb(0x8A, 0x9F, 0xB6, 255),
                    g.high_beam ? 255 : 80);
@@ -1384,6 +1389,24 @@ static void tabs_render(ipgui_widget_t * widget, ipgui_widget_render_ctx_t * ctx
     draw_press_overlay(surf, widget, 300, 64, 28);
 }
 
+/* 顶栏 NAV 入口：点击进入导航页，带幕布转场 */
+static void navbtn_render(ipgui_widget_t * widget, ipgui_widget_render_ctx_t * ctx)
+{
+    ipgui_surf_t * surf = ctx->surf;
+
+    fill_round(surf, 0, 0, 62, 32, 16, accent_color(255), 20);
+    stroke_round(surf, 0, 0, 62, 32, 16, 1, accent_color(255), 110);
+
+    draw_text(surf, &open_sans_9px, "NAV", 10, 11,
+              accent_color(255), 245);
+    draw_line(surf, 44, 11, 49, 16, 1, accent_color(255), 220,
+              IPGUI_LINE_CAP_ROUND);
+    draw_line(surf, 49, 16, 44, 21, 1, accent_color(255), 220,
+              IPGUI_LINE_CAP_ROUND);
+
+    draw_press_overlay(surf, widget, 62, 32, 16);
+}
+
 /*=============================================================================
  * 启动动画
  *===========================================================================*/
@@ -1469,6 +1492,7 @@ static void emoto_event(ipgui_widget_t * widget, ipgui_widget_evt_t * evt)
     ipgui_coord_t x;
 
     if (!widget || !evt) return;
+    if (ipgui_emoto_transition_active()) return;
 
     if (evt->type == IPGUI_WIDGET_EVENT_PRESSED) {
         g.pressed = widget;
@@ -1479,6 +1503,13 @@ static void emoto_event(ipgui_widget_t * widget, ipgui_widget_evt_t * evt)
     if (evt->type != IPGUI_WIDGET_EVENT_RELEASED) return;
 
     x = evt->evt.released_evt.x;
+
+    if (widget == g.w_navbtn) {
+        g.pressed = (ipgui_widget_t *)0;
+        ipgui_widget_mark_dirty(widget);
+        ipgui_emoto_transition_to(IPGUI_EMOTO_PAGE_NAV);
+        return;
+    }
 
     if (widget == g.w_tabs) {
         if (x < 100)      emoto_set_mode(EMOTO_MODE_ECO);
@@ -1536,7 +1567,11 @@ __IPGUI_API__ void ipgui_page_emoto_init(ipgui_scr_t * scr, u8_t page)
     memset(&g, 0, sizeof(g));
 
     ipgui_screen_page_switch(scr, page);
-    g.scr = scr;
+    g.scr     = scr;
+    g.page    = page;
+    g.visible = 1;
+
+    ipgui_emoto_transition_setup(scr, page, IPGUI_EMOTO_PAGE_NAV);
 
     g.mode            = mode;
     g.trip_view       = 0;
@@ -1589,8 +1624,18 @@ __IPGUI_API__ void ipgui_page_emoto_init(ipgui_scr_t * scr, u8_t page)
                              center_render, emoto_event);
     g.w_tabs   = make_widget(250, 386, 300, 64, "emoto_tabs",
                              tabs_render, emoto_event);
+    g.w_navbtn = make_widget(716, 10, 62, 32, "emoto_navbtn",
+                             navbtn_render, emoto_event);
     g.w_boot   = make_widget(0, 0, EMOTO_W, EMOTO_H, "emoto_boot",
                              boot_render, emoto_event);
+    g.w_trans  = make_widget(0, 0, EMOTO_W, EMOTO_H, "NAVIGATION",
+                             ipgui_emoto_transition_render,
+                             (void (*)(struct ipgui_widget *, ipgui_widget_evt_t *))0);
+    if (g.w_trans) {
+        g.w_trans->flags |= IPGUI_WIDGET_FLAG_INVISIBLE;
+        g.w_trans->flags |= IPGUI_WIDGET_FLAG_DISABLED;
+        ipgui_emoto_transition_register(page, g.w_trans);
+    }
 
     g.inited = 1;
 
@@ -1648,6 +1693,9 @@ static void emoto_update_state(s32_t dt)
     s32_t old_acc_b = g.acc_b;
     u8_t old_blink = g.blink;
 
+    g.visible = (g.scr && g.scr->act_page == g.page) ? 1 : 0;
+    if (!g.visible) g.pressed = (ipgui_widget_t *)0;
+
     emoto_simulate(dt);
 
     g.speed = ease_s32(g.speed, g.speed_target, dt, 200);
@@ -1693,7 +1741,8 @@ static void emoto_update_state(s32_t dt)
     g.acc_b = (u8_t)ease_s32(g.acc_b, g.acc_tb, dt, 140);
 
     /* 过渡结束再刷一次整屏，保证外围光晕/环也落到最终主题色 */
-    if ((g.acc_r == g.acc_tr && g.acc_g == g.acc_tg && g.acc_b == g.acc_tb) &&
+    if (g.visible &&
+        (g.acc_r == g.acc_tr && g.acc_g == g.acc_tg && g.acc_b == g.acc_tb) &&
         (old_acc_r != g.acc_r || old_acc_g != g.acc_g || old_acc_b != g.acc_b)) {
         if (g.w_bg) ipgui_widget_mark_dirty(g.w_bg);
     }
@@ -1707,45 +1756,72 @@ static void emoto_update_state(s32_t dt)
     g.high_beam = ((now / 1000) % 30) >= 24;
     g.blink     = (u8_t)(((now / 350) & 1) ? 1 : 0);
 
-    /* 提交脏矩形 */
-    if (g.speed != old_speed || g.power_x10 != old_power ||
-        g.acc_r != old_acc_r || g.acc_g != old_acc_g || g.acc_b != old_acc_b) {
-        if (g.w_center) ipgui_widget_mark_dirty(g.w_center);
+    /* 提交脏矩形：只在 RIDE 页可见时提交，避免给 NAV 页造成无效重绘 */
+    if (g.visible) {
+        if (g.speed != old_speed || g.power_x10 != old_power ||
+            g.acc_r != old_acc_r || g.acc_g != old_acc_g || g.acc_b != old_acc_b) {
+            if (g.w_center) ipgui_widget_mark_dirty(g.w_center);
+        }
+        if (g.soc != old_soc || g.charging) {
+            if (g.w_batt) ipgui_widget_mark_dirty(g.w_batt);
+        }
+        if ((now - g.last_motor_ms) >= 120) {
+            g.last_motor_ms = now;
+            if (g.w_motor) ipgui_widget_mark_dirty(g.w_motor);
+        }
+        if ((now - g.last_trip_ms) >= 400) {
+            g.last_trip_ms = now;
+            if (g.w_trip) ipgui_widget_mark_dirty(g.w_trip);
+        }
+        if (g.blink != old_blink || (now - g.last_batt_ms) >= 500) {
+            g.last_batt_ms = now;
+            if (g.w_tell) ipgui_widget_mark_dirty(g.w_tell);
+        }
+        if (g.tab_x != old_tab) {
+            if (g.w_tabs) ipgui_widget_mark_dirty(g.w_tabs);
+        }
+        if ((now / 60000) != g.last_minute) {
+            g.last_minute = now / 60000;
+            if (g.w_top) ipgui_widget_mark_dirty(g.w_top);
+            if (g.w_nav) ipgui_widget_mark_dirty(g.w_nav);
+        }
     }
-    if (g.soc != old_soc || g.charging) {
-        if (g.w_batt) ipgui_widget_mark_dirty(g.w_batt);
-    }
-    if ((now - g.last_motor_ms) >= 120) {
-        g.last_motor_ms = now;
-        if (g.w_motor) ipgui_widget_mark_dirty(g.w_motor);
-    }
-    if ((now - g.last_trip_ms) >= 400) {
-        g.last_trip_ms = now;
-        if (g.w_trip) ipgui_widget_mark_dirty(g.w_trip);
-    }
-    if (g.blink != old_blink || (now - g.last_batt_ms) >= 500) {
-        g.last_batt_ms = now;
-        if (g.w_tell) ipgui_widget_mark_dirty(g.w_tell);
-    }
-    if (g.tab_x != old_tab) {
-        if (g.w_tabs) ipgui_widget_mark_dirty(g.w_tabs);
-    }
-    if ((now / 60000) != g.last_minute) {
-        g.last_minute = now / 60000;
-        if (g.w_top) ipgui_widget_mark_dirty(g.w_top);
-        if (g.w_nav) ipgui_widget_mark_dirty(g.w_nav);
-    }
+
     if ((now - g.boot_start) < (EMOTO_BOOT_MS + EMOTO_BOOT_FADE_MS)) {
-        if (g.w_boot) ipgui_widget_mark_dirty(g.w_boot);
+        if (g.visible && g.w_boot) ipgui_widget_mark_dirty(g.w_boot);
     } else if (!g.boot_done) {
         g.boot_done = 1;
         if (g.w_boot) {
             g.w_boot->flags |= IPGUI_WIDGET_FLAG_INVISIBLE;
             g.w_boot->flags |= IPGUI_WIDGET_FLAG_DISABLED;
         }
-        if (g.scr) {
+        if (g.visible && g.scr) {
             ipgui_dirty_rect_add_xywh(&g.scr->dirty, 0, 0, EMOTO_W, EMOTO_H);
         }
+    }
+
+    /* 发布车辆快照，NAV 页直接读取，不复制模拟逻辑 */
+    {
+        ipgui_emoto_snapshot_t s;
+        memset(&s, 0, sizeof(s));
+        s.valid      = 1;
+        s.mode       = g.mode;
+        s.charging   = g.charging;
+        s.left_on    = g.left_on;
+        s.right_on   = g.right_on;
+        s.high_beam  = g.high_beam;
+        s.abs_on     = g.abs_on;
+        s.tc_on      = g.tc_on;
+        s.speed      = g.speed;
+        s.soc        = g.soc;
+        s.range_km   = g.range_km;
+        s.power_x10  = g.power_x10;
+        s.motor_temp = g.motor_temp;
+        s.volt_x10   = g.volt_x10;
+        s.trip_x100  = g.trip_x100;
+        s.odo_x100   = g.odo_x100;
+        s.avg_speed  = g.avg_speed;
+        ipgui_emoto_shared_publish(&s);
     }
 }
 

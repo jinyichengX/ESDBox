@@ -23,6 +23,7 @@
 #include "ipgui_draw_box_shadow.h"
 #include "ipgui_blur.h"
 #include "ipgui_page_emoto.h"
+#include "ipgui_page_emoto_nav.h"
 #include "ipgui_memory.h"
 #include <math.h>
 #undef main
@@ -1419,10 +1420,13 @@ int main(void)
     btn_next4->h = 40;
     btn_next4->priv_data = (void *)&col_purple;
 
-    /* ========== 第 4 页：E-MOTION 电摩 HMI ========== */
+    /* ========== 第 4 页：E-MOTION 电摩 HMI（RIDE）========== */
     ipgui_page_emoto_init(&main_screen, 4);
 
-    /* 启动页：直接进入 E-MOTION HMI
+    /* ========== 第 5 页：E-MOTION 电摩 HMI（NAV）========== */
+    ipgui_page_emoto_nav_init(&main_screen, 5);
+
+    /* 启动页：直接进入 E-MOTION RIDE
      * 如果想回到原来的演示首页，把下面这行改成 page 0 即可 */
     ipgui_screen_page_switch(&main_screen, 4);
 
@@ -1458,9 +1462,10 @@ int main(void)
         /* 驱动所有动画，需在渲染之前调用 */
         ipgui_anim_update_all();
 
-        /* E-MOTION 页面只在当前页时推进，避免给非活动页提交脏矩形 */
-        if (main_screen.act_page == 4)
-            ipgui_page_emoto_tick();
+        /* E-MOTION 两页共用车辆状态：RIDE 页始终推进模拟，
+         * 内部只在 RIDE 可见时提交脏矩形；NAV 页自行按可见性刷新 */
+        ipgui_page_emoto_tick();
+        ipgui_page_emoto_nav_tick();
 
         ipgui_screen_render(&main_screen);
 
