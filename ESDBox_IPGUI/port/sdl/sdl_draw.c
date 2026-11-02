@@ -41,7 +41,8 @@ int ipgui_sdl_screen_init(ipgui_scr_t * scr)
 
     SDL_Init(SDL_INIT_VIDEO); 
     SDL_CreateWindowAndRenderer( scr->drv->xreso, scr->drv->yreso, 0, &priv->window, &priv->renderer);
-    SDL_SetWindowPosition(priv->window, 100, 800);
+    SDL_SetWindowTitle(priv->window, "E-MOTION / IPGUI HMI");
+    SDL_SetWindowPosition(priv->window, 100, 100);
     SDL_SetRenderDrawColor(priv->renderer, 0, 0, 0, SDL_ALPHA_OPAQUE); 
     SDL_RenderClear(priv->renderer); 
     priv->surface = SDL_GetWindowSurface(priv->window);

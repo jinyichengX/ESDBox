@@ -22,6 +22,7 @@
 #include "ipgui_draw_box_background.h"
 #include "ipgui_draw_box_shadow.h"
 #include "ipgui_blur.h"
+#include "ipgui_page_emoto.h"
 #include "ipgui_memory.h"
 #include <math.h>
 #undef main
@@ -681,6 +682,13 @@ static void page3_back_handler(ipgui_widget_t * w, ipgui_widget_evt_t * e)
 {
     if (e->type == IPGUI_WIDGET_EVENT_RELEASED)
         ipgui_screen_page_switch(&main_screen, 2);
+}
+
+/* ========== 第 4 页：E-MOTION 电摩 HMI ========== */
+static void page_next4_handler(ipgui_widget_t * w, ipgui_widget_evt_t * e)
+{
+    if (e->type == IPGUI_WIDGET_EVENT_RELEASED)
+        ipgui_screen_page_switch(&main_screen, 4);
 }
 
 /* ========== 第 2 页：手机桌面图标排布 ==========
@@ -1401,8 +1409,22 @@ int main(void)
     btn_back3->h = 40;
     btn_back3->priv_data = (void *)&col_gray;
 
-    /* 回到启动页，运行时用 NEXT / BACK 互切 */
-    ipgui_screen_page_switch(&main_screen, 0);
+    ipgui_widget_t * btn_next4 = ipgui_widget_create(NULL);
+    btn_next4->name = "HMI";
+    btn_next4->render = color_render;
+    btn_next4->event_handler = page_next4_handler;
+    btn_next4->x = 660;
+    btn_next4->y = 425;
+    btn_next4->w = 120;
+    btn_next4->h = 40;
+    btn_next4->priv_data = (void *)&col_purple;
+
+    /* ========== 第 4 页：E-MOTION 电摩 HMI ========== */
+    ipgui_page_emoto_init(&main_screen, 4);
+
+    /* 启动页：直接进入 E-MOTION HMI
+     * 如果想回到原来的演示首页，把下面这行改成 page 0 即可 */
+    ipgui_screen_page_switch(&main_screen, 4);
 
     /* ========== 曲线控件 ========== */
     // ipgui_widget_t * widget_curve = ipgui_widget_create(NULL);
@@ -1415,38 +1437,50 @@ int main(void)
 
 
     ipgui_input_src_evt_t raw_evt;
+    u32_t last_tick_ms = SDL_GetTicks();
+
     while(1)
     {
-        /* 读取原始事件 */
-        pointer_src.input_src_event_read_cb(&pointer_src, &raw_evt);
-        /* push into queue */
-        ipgui_norm_queue_post(&dispatcher.evt_queue, &raw_evt, sizeof(raw_evt));
+        /* 读取所有待处理指针事件，不再把“空事件”塞进队列 */
+        while (pointer_src.input_src_event_read_cb(&pointer_src, &raw_evt)
+               == IPGUI_ERR_READ_INPUT_SRC_EVT_OK) {
+            ipgui_norm_queue_post(&dispatcher.evt_queue, &raw_evt, sizeof(raw_evt));
+        }
 
-        // printf("原始事件: 输入源ID=%d, 事件=%s, 坐标(%d, %d)\n", 
-        //     raw_evt.input_src_id, 
-        //     raw_evt.input_src_evt == IPGUI_INPUT_SRC_EVENT_POINTER_PRESS  ? "按压" :
-        //     raw_evt.input_src_evt == IPGUI_INPUT_SRC_EVENT_POINTER_RELEASE ? "释放" : "其他",
-        //     raw_evt.evt_info.pointer_pos.x, 
-        //     raw_evt.evt_info.pointer_pos.y);
-
-        /* 悬停状态每帧复位，dispatch 会在当帧重新设置 */
-        widget_livingroom_update(widget_labal_livingroom);
-        widget_tablelamp_update(widget_tablelamp);
+        /* 悬停状态每帧复位，dispatch 会在当帧重新设置
+         * 只推进当前页的控件，避免非活动页往 HMI 的帧里提交脏矩形 */
+        if (main_screen.act_page == 0) {
+            widget_livingroom_update(widget_labal_livingroom);
+            widget_tablelamp_update(widget_tablelamp);
+        }
         
         ipgui_dispatch_input_event(&dispatcher);
         /* 驱动所有动画，需在渲染之前调用 */
         ipgui_anim_update_all();
+
+        /* E-MOTION 页面只在当前页时推进，避免给非活动页提交脏矩形 */
+        if (main_screen.act_page == 4)
+            ipgui_page_emoto_tick();
+
         ipgui_screen_render(&main_screen);
 
-        /* 每个控件自己的 per-frame update */
-        widget_switch_label_update(widget_switch_label);
-        widget_switch_update(widget_switch);
-        widget_knob_update(widget_brightness_label);
-        widget_wave_update(widget3);
-        // widget_curve_update(widget_curve);
+        /* 每个控件自己的 per-frame update（仅第 0 页） */
+        if (main_screen.act_page == 0) {
+            widget_switch_label_update(widget_switch_label);
+            widget_switch_update(widget_switch);
+            widget_knob_update(widget_brightness_label);
+            widget_wave_update(widget3);
+            // widget_curve_update(widget_curve);
+        }
 
-        /* 心跳 */
-        ipgui_tick_inc();
+        /* 心跳：按真实毫秒推进，保证 HMI 动画速度与墙钟一致 */
+        {
+            u32_t now_ms = SDL_GetTicks();
+            u32_t delta = now_ms - last_tick_ms;
+            last_tick_ms = now_ms;
+            if (delta > 50) delta = 50;
+            while (delta --) ipgui_tick_inc();
+        }
         Sleep(1);
     }
 
