@@ -150,6 +150,170 @@ void color_render(ipgui_widget_t * w, ipgui_widget_render_ctx_t * ctx)
     }
 }
 
+/* ===== 阴影用例页：一屏铺多个不同参数的阴影，方便横向对比 ===== */
+typedef struct {
+    ipgui_coord_t blur;
+    ipgui_coord_t spread;
+    ipgui_coord_t offset_x;
+    ipgui_coord_t offset_y;
+    u8_t          opacity;
+    u8_t          use_gradient;
+    u32_t         color;
+    ipgui_coord_t r_lt, r_rt, r_lb, r_br;
+    ipgui_coord_t cx, cy;          /* 卡片在全屏控件内的位置 */
+    const s8_t  * label;
+} shadow_case_t;
+
+static shadow_case_t shadow_cases[] = {
+    {  8, 0,  0,  0,  70, 0, 0x000000, 12,12,12,12,  30, 60, "blur 8"    },
+    { 28, 0,  0,  0, 100, 0, 0x000000, 12,12,12,12, 220, 60, "blur 28"   },
+    { 10, 10, 0,  0,  90, 0, 0x000000, 12,12,12,12, 410, 60, "spread 10" },
+    { 12, 0, 12, 12, 110, 0, 0x000000, 12,12,12,12, 600, 60, "offset 12" },
+    { 16, 0,  0,  0, 150, 0, 0x2f6fed, 12,12,12,12,  30,235, "blue"      },
+    { 14, 0,  0,  0,  90, 0, 0x000000,  4,24,32,12, 220,235, "4 radii"   },
+    { 18, 0,  0,  0,  90, 0, 0x000000, 40,40,40,40, 410,235, "radius 40" },
+    { 20, 0,  0,  0, 255, 1, 0x000000, 12,12,12,12, 600,235, "gradient"  },
+};
+
+static void draw_one_shadow_case(ipgui_widget_render_ctx_t * ctx, shadow_case_t * c)
+{
+    ipgui_aabb_t box = {{c->cx, c->cy}, {c->cx + 149, c->cy + 119}};
+
+    ipgui_box_style_t s; ipgui_memset(&s, 0, sizeof(s));
+    s.left_top_radius     = c->r_lt;
+    s.right_top_radius    = c->r_rt;
+    s.left_bottom_radius  = c->r_lb;
+    s.right_bottom_radius = c->r_br;
+
+    ipgui_box_outer_shadow_style_t sh; ipgui_memset(&sh, 0, sizeof(sh));
+    if (c->use_gradient) {
+        sh.paint.type = IPGUI_PAINT_GRADIENT;
+        sh.paint.src.grad_src.grad_type = IPGUI_GRADIENT_TYPE_LINEAR;
+        ipgui_liner_gradient_init_direct(&sh.paint.src.grad_src.grad.liner_grad,
+            0, 0, 799, 0);
+        ipgui_gradient_color_stop_t a; a.pos = 0;
+        IPGUI_COLOR_SET(a.color, 255, 0xff5a5a);
+        ipgui_gradient_color_stop_t b; b.pos = 255;
+        IPGUI_COLOR_SET(b.color, 255, 0x4a7bff);
+        ipgui_liner_gradient_add_stop(&sh.paint.src.grad_src.grad.liner_grad, &a);
+        ipgui_liner_gradient_add_stop(&sh.paint.src.grad_src.grad.liner_grad, &b);
+    } else {
+        sh.paint.type = IPGUI_PAINT_COLOR;
+        IPGUI_COLOR_SET(sh.paint.src.color, 255, c->color);
+    }
+    sh.opacity  = c->opacity;
+    sh.blur     = c->blur;
+    sh.spread   = c->spread;
+    sh.offset_x = c->offset_x;
+    sh.offset_y = c->offset_y;
+    ipgui_draw_box_outer_shadow(ctx->surf, NULL, &box, &s, &sh);
+
+    ipgui_box_bg_style_t bg; ipgui_memset(&bg, 0, sizeof(bg));
+    bg.paint.type = IPGUI_PAINT_COLOR;
+    IPGUI_COLOR_SET(bg.paint.src.color, 255, 0xFAFAFA);
+    bg.opacity    = 255;
+    bg.blend_mode = IPGUI_BLEND_NORMAL;
+    ipgui_draw_box_background(ctx->surf, NULL, &box, &s, &bg);
+
+    if (c->label) {
+        ipgui_font_style_t fs; ipgui_memset(&fs, 0, sizeof(fs));
+        fs.font = &open_sans_11px;
+        fs.paint.type = IPGUI_PAINT_COLOR;
+        IPGUI_COLOR_SET(fs.paint.src.color, 255, 0x556070);
+        fs.opacity    = 255;
+        fs.blend_mode = IPGUI_BLEND_NORMAL;
+        ipgui_coord_t tw = ipgui_builtin_text_width(fs.font, c->label);
+        ipgui_draw_builtin_text(ctx->surf, NULL, &fs, c->label,
+            c->cx + (150 - tw) / 2, c->cy + 120 - 22);
+    }
+}
+
+/* 一个全屏控件里画完所有用例：
+ * 阴影会扩展出控件本体之外，控件必须留够绘制区域，否则会被裁掉 */
+static void shadow_cases_render(ipgui_widget_t * w, ipgui_widget_render_ctx_t * ctx)
+{
+    (void)w;
+    for (int i = 0; i < (int)(sizeof(shadow_cases) / sizeof(shadow_cases[0])); i ++) {
+        draw_one_shadow_case(ctx, &shadow_cases[i]);
+    }
+}
+
+/* 用例页的底板：浅灰底 + 标题，让阴影对比不受壁纸干扰 */
+static void shadow_page_bg_render(ipgui_widget_t * w, ipgui_widget_render_ctx_t * ctx)
+{
+    ipgui_aabb_t box = {{0, 0}, {w->w - 1, w->h - 1}};
+    ipgui_box_style_t s; ipgui_memset(&s, 0, sizeof(s));
+    ipgui_box_bg_style_t bg; ipgui_memset(&bg, 0, sizeof(bg));
+    bg.paint.type = IPGUI_PAINT_COLOR;
+    IPGUI_COLOR_SET(bg.paint.src.color, 255, 0xEDEDF2);
+    bg.opacity    = 255;
+    bg.blend_mode = IPGUI_BLEND_NORMAL;
+    ipgui_draw_box_background(ctx->surf, NULL, &box, &s, &bg);
+
+    ipgui_font_style_t fs; ipgui_memset(&fs, 0, sizeof(fs));
+    fs.font = &open_sans_18px;
+    fs.paint.type = IPGUI_PAINT_COLOR;
+    IPGUI_COLOR_SET(fs.paint.src.color, 255, 0x445066);
+    fs.opacity    = 255;
+    fs.blend_mode = IPGUI_BLEND_NORMAL;
+    ipgui_draw_builtin_text(ctx->surf, NULL, &fs, "BOX SHADOW CASES", 30, 20);
+}
+    // ipgui_aabb_t clip_shadow = {{0,0},{0,0}};
+/* ===== 阴影验证例子 ===== */
+static void shadow_demo_render(ipgui_widget_t * w, ipgui_widget_render_ctx_t * ctx)
+{
+    (void)w;
+    ipgui_aabb_t box = {{40 + 200, 40}, {159 + 200, 159}};
+    ipgui_box_style_t s; ipgui_memset(&s, 0, sizeof(s));
+    s.left_top_radius    = 4;
+    s.right_top_radius   = 24;
+    s.left_bottom_radius = 32;
+    s.right_bottom_radius = 12;
+
+    ipgui_paint_t paint;
+    paint.type = IPGUI_PAINT_GRADIENT;
+    paint.src.grad_src.grad_type = IPGUI_GRADIENT_TYPE_LINEAR;
+
+    ipgui_liner_gradient_init_direct(&paint.src.grad_src.grad.liner_grad, 
+        0, 0, 799, 0);
+    ipgui_gradient_color_stop_t stop1;
+    stop1.pos = 0;
+    IPGUI_COLOR_SET(stop1.color, 255, 0x597821);
+    ipgui_gradient_color_stop_t stop2;
+    stop2.pos = 255;
+    IPGUI_COLOR_SET(stop2.color, 255, 0xf0631e);
+    ipgui_liner_gradient_add_stop(&paint.src.grad_src.grad.liner_grad, &stop1);
+    ipgui_liner_gradient_add_stop(&paint.src.grad_src.grad.liner_grad, &stop2);
+
+    ipgui_box_outer_shadow_style_t sh;
+    ipgui_memset(&sh, 0, sizeof(sh));
+    // sh.paint.type = IPGUI_PAINT_COLOR;
+    // IPGUI_COLOR_SET(sh.paint.src.color, 255, 0xFF0000);
+    sh.paint = paint;
+    sh.opacity  = 255;
+    sh.blur     = 12;
+    sh.spread   = 30;
+    sh.offset_x = 50;
+    sh.offset_y = 0;
+
+    ipgui_aabb_t clip_shadow;
+    clip_shadow.start.x = 0;
+    clip_shadow.start.y = 0;
+    clip_shadow.end.x = 400;
+    clip_shadow.end.y = 100;
+    ipgui_draw_box_outer_shadow(ctx->surf, &clip_shadow, &box, &s, &sh);
+
+    ipgui_box_bg_style_t bg;
+    bg.paint.type = IPGUI_PAINT_COLOR;
+    IPGUI_COLOR_SET(bg.paint.src.color, 255, 0xF0F0F0);
+    bg.opacity = 255;
+    bg.blend_mode = IPGUI_BLEND_NORMAL;
+
+
+
+    ipgui_draw_box_background(ctx->surf, NULL, &box, &s, &bg);
+}
+
 // /* 滚动事件处理：修改触发控件的 scroll_x/y */
 // void scroll_handler(ipgui_widget_t * w, ipgui_widget_evt_t * e)
 // {
@@ -505,6 +669,18 @@ static void page2_back_handler(ipgui_widget_t * w, ipgui_widget_evt_t * e)
 {
     if (e->type == IPGUI_WIDGET_EVENT_RELEASED)
         ipgui_screen_page_switch(&main_screen, 1);
+}
+
+static void page_next3_handler(ipgui_widget_t * w, ipgui_widget_evt_t * e)
+{
+    if (e->type == IPGUI_WIDGET_EVENT_RELEASED)
+        ipgui_screen_page_switch(&main_screen, 3);
+}
+
+static void page3_back_handler(ipgui_widget_t * w, ipgui_widget_evt_t * e)
+{
+    if (e->type == IPGUI_WIDGET_EVENT_RELEASED)
+        ipgui_screen_page_switch(&main_screen, 2);
 }
 
 /* ========== 第 2 页：手机桌面图标排布 ==========
@@ -968,6 +1144,15 @@ int main(void)
     btn_next->h = 40;
     btn_next->priv_data = (void *)&col_purple;
 
+    /* ===== 阴影验证例子 ===== */
+    // ipgui_widget_t * shadow_demo = ipgui_widget_create(NULL);
+    // shadow_demo->name = NULL;
+    // shadow_demo->render = shadow_demo_render;
+    // shadow_demo->x = 0;
+    // shadow_demo->y = 0;
+    // shadow_demo->w = 799;
+    // shadow_demo->h = 479;
+
     /* 切到第 1 页后再创建，ipgui_widget_create(NULL) 会挂到当前页 */
     ipgui_screen_page_switch(&main_screen, 1);
 
@@ -1175,6 +1360,47 @@ int main(void)
     btn_back2->h = 40;
     btn_back2->priv_data = (void *)&col_gray;
 
+    /* 第 2 页的 NEXT：进阴影用例页 */
+    ipgui_widget_t * btn_next3 = ipgui_widget_create(NULL);
+    btn_next3->name = "NEXT";
+    btn_next3->render = color_render;
+    btn_next3->event_handler = page_next3_handler;
+    btn_next3->x = 660;
+    btn_next3->y = 425;
+    btn_next3->w = 120;
+    btn_next3->h = 40;
+    btn_next3->priv_data = (void *)&col_purple;
+
+    /* ========== 第 3 页：阴影用例 ========== */
+    ipgui_screen_page_switch(&main_screen, 3);
+
+    ipgui_widget_t * shadow_bg = ipgui_widget_create(NULL);
+    shadow_bg->name = NULL;
+    shadow_bg->render = shadow_page_bg_render;
+    shadow_bg->x = 0;
+    shadow_bg->y = 0;
+    shadow_bg->w = 799;
+    shadow_bg->h = 479;
+
+    /* 阴影会画到控件本体之外，这里用一个全屏控件承载，避免被裁剪 */
+    ipgui_widget_t * shadow_cases_w = ipgui_widget_create(NULL);
+    shadow_cases_w->name = NULL;
+    shadow_cases_w->render = shadow_cases_render;
+    shadow_cases_w->x = 0;
+    shadow_cases_w->y = 0;
+    shadow_cases_w->w = 799;
+    shadow_cases_w->h = 479;
+
+    ipgui_widget_t * btn_back3 = ipgui_widget_create(NULL);
+    btn_back3->name = "BACK";
+    btn_back3->render = color_render;
+    btn_back3->event_handler = page3_back_handler;
+    btn_back3->x = 20;
+    btn_back3->y = 425;
+    btn_back3->w = 120;
+    btn_back3->h = 40;
+    btn_back3->priv_data = (void *)&col_gray;
+
     /* 回到启动页，运行时用 NEXT / BACK 互切 */
     ipgui_screen_page_switch(&main_screen, 0);
 
@@ -1222,7 +1448,6 @@ int main(void)
         /* 心跳 */
         ipgui_tick_inc();
         Sleep(1);
-
     }
 
 

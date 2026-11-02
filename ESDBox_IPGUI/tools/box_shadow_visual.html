@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Box Shadow 渲染实验 · IPGUI</title>
+<style>
+  :root{
+    --ink:#15171c;
+    --muted:#6b7280;
+    --faint:#9aa1ad;
+    --line:#e7e8ee;
+    --bg:#fbfbfc;
+    --accent:#2f6fed;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:52px 40px 90px}
+
+  header{display:flex;align-items:baseline;justify-content:space-between;gap:24px}
+  h1{font-size:20px;font-weight:600;letter-spacing:-.01em}
+  .sub{color:var(--muted);font-size:13px}
+  .rule{height:1px;background:var(--line);margin:20px 0 44px}
+
+  .demo + .demo{margin-top:60px;padding-top:56px;border-top:1px solid var(--line)}
+  h2{font-size:16px;font-weight:600;letter-spacing:-.01em}
+  h2 em{font-style:normal;color:var(--faint);font-weight:400;margin-left:10px;font-size:13px}
+  .desc{color:var(--muted);font-size:13.5px;margin:8px 0 22px;max-width:62ch}
+
+  .stage{position:relative;background:#eef0f4;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  canvas{display:block;width:100%;height:auto}
+
+  .bar{display:flex;flex-wrap:wrap;gap:30px;align-items:flex-end;margin-top:22px}
+  .ctl{flex:1 1 170px;min-width:140px}
+  .ctl .lab{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--muted);margin-bottom:7px}
+  .ctl .lab b{color:var(--faint);font-weight:400;font-variant-numeric:tabular-nums}
+
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:16px;background:transparent;cursor:pointer}
+  input[type=range]::-webkit-slider-runnable-track{height:2px;background:#dcdfe5;border-radius:2px}
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;width:14px;height:14px;border-radius:50%;
+    background:#fff;border:1.5px solid var(--accent);margin-top:-6px;
+    box-shadow:0 1px 3px rgba(21,23,28,.14);transition:transform .12s ease;
+  }
+  input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
+  input[type=range]::-moz-range-track{height:2px;background:#dcdfe5;border-radius:2px}
+  input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:50%;background:#fff;border:1.5px solid var(--accent)}
+
+  .sw{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding-bottom:2px}
+  .sw span{font-size:12.5px;color:var(--muted);white-space:nowrap}
+  .switch{position:relative;width:38px;height:22px}
+  .switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
+  .switch i{position:absolute;inset:0;border-radius:11px;background:#dcdfe5;transition:background .18s ease}
+  .switch i::after{
+    content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 3px rgba(21,23,28,.2);
+    transition:transform .18s cubic-bezier(.3,.7,.3,1);
+  }
+  .switch input:checked + i{background:var(--accent)}
+  .switch input:checked + i::after{transform:translateX(16px)}
+
+  .note{margin-top:22px;color:var(--muted);font-size:12.5px}
+  .note b{color:var(--ink);font-weight:500}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}
+
+  footer{margin-top:70px;padding-top:20px;border-top:1px solid var(--line);color:var(--faint);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Box Shadow 渲染实验</h1>
+    <div class="sub">IPGUI · ipgui_draw_box_shadow</div>
+  </header>
+  <div class="rule"></div>
+
+  <!-- ============ 1 ============ -->
+  <section class="demo">
+    <h2>圆角缺口<em>阴影从控件自己的圆角里透出来</em></h2>
+    <p class="desc">阴影画在卡片背后。卡片圆角弧线以外的角部是透明的，而阴影恰好覆盖到这里，于是透出一块带弧边的灰三角。右上角是 3× 放大。</p>
+
+    <div class="stage"><canvas id="cvGap"></canvas></div>
+
+    <div class="bar">
+      <div class="ctl"><div class="lab"><span>圆角</span><b id="oR">16</b></div><input type="range" id="iR" min="0" max="70" value="16"></div>
+      <div class="ctl"><div class="lab"><span>模糊</span><b id="oB">12</b></div><input type="range" id="iB" min="0" max="40" value="12"></div>
+      <div class="ctl"><div class="lab"><span>扩散</span><b id="oS">12</b></div><input type="range" id="iS" min="0" max="30" value="12"></div>
+      <div class="ctl"><div class="lab"><span>不透明度</span><b id="oO">220</b></div><input type="range" id="iO" min="0" max="255" value="220"></div>
+      <div class="sw"><span>按 CSS 裁掉边框盒</span><label class="switch"><input type="checkbox" id="iC"><i></i></label></div>
+    </div>
+
+    <p class="note"><b>CSS 规则</b>：外阴影只画在 border-box 之外。圆角缺口属于 border-box，必须挖空。</p>
+  </section>
+
+  <!-- ============ 2 ============ -->
+  <section class="demo">
+    <h2>绘制区域<em>控件矩形不够大，阴影被齐边切掉</em></h2>
+    <p class="desc">框架交给控件的是它自己的矩形。阴影要画到盒子外面，矩形不够大就会被裁，看起来像“外层没有递减”。蓝色虚线是控件的绘制区域。</p>
+
+    <div class="stage"><canvas id="cvClip"></canvas></div>
+
+    <div class="bar">
+      <div class="ctl"><div class="lab"><span>绘制区域外扩</span><b id="oM">8</b></div><input type="range" id="iM" min="0" max="60" value="8"></div>
+      <div class="ctl"><div class="lab"><span>模糊</span><b id="oB2">24</b></div><input type="range" id="iB2" min="4" max="40" value="24"></div>
+      <div class="sw"><span>显示控件矩形</span><label class="switch"><input type="checkbox" id="iShow" checked><i></i></label></div>
+    </div>
+
+    <p class="note"><b>约束</b>：控件尺寸要比可见盒子每边多 <code>pad + max(offset, 0)</code>，<code>pad ≈ 0.75 × blur</code>。</p>
+  </section>
+
+  <footer>管线与 C 实现一致：圆角覆盖率 mask → 3 趟居中均值模糊 → mask × opacity 混合。</footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var W = 1040, H = 420;          // 画布逻辑尺寸
+  var CW = 260, CH = 170;         // 卡片尺寸
+  var CX = (W - CW) / 2;          // 卡片位置
+  var CY = (H - CH) / 2;
+  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+  /* ---------- 与 C 实现对齐 ---------- */
+  function oddKernel(blur) {
+    if (blur <= 0) return 1;
+    var kn = Math.floor(blur / 2) + 1;
+    if (kn < 3) kn = 3;
+    if ((kn & 1) === 0) kn++;
+    return kn;
+  }
+  function padOf(kn) { return kn <= 1 ? 0 : 3 * (kn >> 1); }
+
+  /* ---------- mask ---------- */
+  function buildMask(cw, ch, r, kn) {
+    var pad = padOf(kn);
+    var mw = cw + pad * 2, mh = ch + pad * 2;
+    var m = new Uint8Array(mw * mh);
+    var y;
+
+    for (y = 0; y < ch; y++) m.fill(255, (pad + y) * mw + pad, (pad + y) * mw + pad + cw);
+
+    if (r > 0) {
+      var rmax = Math.min(cw >> 1, ch >> 1);
+      if (r > rmax) r = rmax;
+      var cs = [
+        [pad + r,      pad + r,      pad,          pad,          false, false],
+        [pad + cw - r, pad + r,      pad + cw - 1, pad,          true,  false],
+        [pad + r,      pad + ch - r, pad,          pad + ch - 1, false, true ],
+        [pad + cw - r, pad + ch - r, pad + cw - 1, pad + ch - 1, true,  true ]
+      ];
+      for (var c = 0; c < 4; c++) {
+        var k = cs[c];
+        for (var j = 0; j < r; j++) {
+          for (var i = 0; i < r; i++) {
+            var px = k[4] ? k[2] - i : k[2] + i;
+            var py = k[5] ? k[3] - j : k[3] + j;
+            var cover = 0;
+            for (var sy = 0; sy < 4; sy++) {
+              for (var sx = 0; sx < 4; sx++) {
+                var dx = px + (sx + .5) / 4 - k[0];
+                var dy = py + (sy + .5) / 4 - k[1];
+                if (dx * dx + dy * dy <= r * r) cover++;
+              }
+            }
+            m[py * mw + px] = Math.round(cover * 255 / 16);
+          }
+        }
+      }
+    }
+    return { m: m, w: mw, h: mh, pad: pad, kn: kn };
+  }
+
+  function blurH(src, w, h, k) {
+    var out = new Uint8Array(w * h), half = (k - 1) >> 1;
+    for (var y = 0; y < h; y++) {
+      var row = y * w, sum = 0, i;
+      for (i = -half; i <= half; i++) if (i >= 0 && i < w) sum += src[row + i];
+      for (var x = 0; x < w; x++) {
+        out[row + x] = (sum / k) | 0;
+        var lv = x - half, en = x + half + 1;
+        if (lv >= 0 && lv < w) sum -= src[row + lv];
+        if (en >= 0 && en < w) sum += src[row + en];
+      }
+    }
+    return out;
+  }
+  function blurV(src, w, h, k) {
+    var out = new Uint8Array(w * h), half = (k - 1) >> 1;
+    for (var x = 0; x < w; x++) {
+      var sum = 0, i;
+      for (i = -half; i <= half; i++) if (i >= 0 && i < h) sum += src[i * w + x];
+      for (var y = 0; y < h; y++) {
+        out[y * w + x] = (sum / k) | 0;
+        var lv = y - half, en = y + half + 1;
+        if (lv >= 0 && lv < h) sum -= src[lv * w + x];
+        if (en >= 0 && en < h) sum += src[en * w + x];
+      }
+    }
+    return out;
+  }
+  function blur3(box) {
+    var cur = box.m;
+    for (var p = 0; p < 3; p++) {
+      cur = blurH(cur, box.w, box.h, box.kn);
+      cur = blurV(cur, box.w, box.h, box.kn);
+    }
+    return cur;
+  }
+
+  /* ---------- 画布 ---------- */
+  function mkCanvas(w, h) {
+    var c = document.createElement('canvas');
+    c.width = w * DPR; c.height = h * DPR;
+    var g = c.getContext('2d');
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    return { el: c, ctx: g };
+  }
+
+  function roundPath(g, x, y, w, h, r) {
+    var rr = Math.max(0, Math.min(r, w / 2, h / 2));
+    g.beginPath();
+    g.moveTo(x + rr, y);
+    g.lineTo(x + w - rr, y);
+    g.arcTo(x + w, y, x + w, y + rr, rr);
+    g.lineTo(x + w, y + h - rr);
+    g.arcTo(x + w, y + h, x + w - rr, y + h, rr);
+    g.lineTo(x + rr, y + h);
+    g.arcTo(x, y + h, x, y + h - rr, rr);
+    g.lineTo(x, y + rr);
+    g.arcTo(x, y, x + rr, y, rr);
+    g.closePath();
+  }
+
+  var shadowLayer = mkCanvas(W, H);
+  var composite   = mkCanvas(W, H);
+  var tmpMask     = document.createElement('canvas');
+
+  /**
+   * 生成阴影图层（纯 alpha 黑），返回布局信息
+   */
+  function buildShadow(o) {
+    var kn = oddKernel(o.blur);
+    var sp = o.spread || 0;
+    var cw = CW + sp * 2, ch = CH + sp * 2;
+    var rad = o.r > 0 ? o.r + sp : 0;
+
+    var box = buildMask(cw, ch, rad, kn);
+    var buf = kn > 1 ? blur3(box) : box.m;
+
+    var bx = o.x - sp + o.offsetX - box.pad;
+    var by = o.y - sp + o.offsetY - box.pad;
+
+    var g = shadowLayer.ctx;
+    g.clearRect(0, 0, W, H);
+
+    tmpMask.width = box.w;
+    tmpMask.height = box.h;
+    var tctx = tmpMask.getContext('2d');
+    var img = tctx.createImageData(box.w, box.h);
+    var d = img.data;
+    for (var i = 0, n = box.w * box.h; i < n; i++) {
+      var a = (buf[i] * o.opacity / 255) | 0, q = i * 4;
+      d[q + 3] = a;
+    }
+    tctx.putImageData(img, 0, 0);
+    g.drawImage(tmpMask, bx, by);
+
+    if (o.cssClip) {
+      g.globalCompositeOperation = 'destination-out';
+      roundPath(g, o.x, o.y, CW, CH, o.r);
+      g.fill();
+      g.globalCompositeOperation = 'source-over';
+    }
+    return { pad: box.pad, kn: kn };
+  }
+
+  /* ---------- 放大镜 ---------- */
+  function drawLoupe(dst, src, cx, cy, zoom) {
+    var srcSize = 110, dstSize = 220;
+    var sx = cx - srcSize / 2, sy = cy - srcSize / 2;
+    var dx = W - dstSize - 28, dy = 28;
+
+    dst.save();
+    dst.imageSmoothingEnabled = false;
+    dst.drawImage(src.el,
+      sx * DPR, sy * DPR, srcSize * DPR, srcSize * DPR,
+      dx, dy, dstSize, dstSize);
+    dst.restore();
+
+    dst.save();
+    dst.strokeStyle = 'rgba(21,23,28,.18)';
+    dst.lineWidth = 1;
+    dst.strokeRect(dx + .5, dy + .5, dstSize - 1, dstSize - 1);
+    dst.fillStyle = 'rgba(21,23,28,.42)';
+    dst.font = '12px -apple-system, "PingFang SC", sans-serif';
+    dst.fillText(zoom + '× 放大', dx + 2, dy - 8);
+    dst.restore();
+  }
+
+  /* ---------- 演示 1 ---------- */
+  var cvGap = document.getElementById('cvGap');
+  cvGap.width = W * DPR; cvGap.height = H * DPR;
+  cvGap.style.width = '100%'; cvGap.style.height = 'auto';
+  var gapCtx = cvGap.getContext('2d');
+  gapCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+  var gR = document.getElementById('iR'), gB = document.getElementById('iB');
+  var gS = document.getElementById('iS'), gO = document.getElementById('iO');
+  var gC = document.getElementById('iC');
+  var oR = document.getElementById('oR'), oB = document.getElementById('oB');
+  var oS = document.getElementById('oS'), oO = document.getElementById('oO');
+
+  var gapQueued = false;
+  function drawGap() {
+    gapQueued = false;
+    var r = +gR.value, blur = +gB.value, sp = +gS.value, op = +gO.value;
+
+    buildShadow({ x: CX, y: CY, r: r, blur: blur, spread: sp,
+                  offsetX: 0, offsetY: 6, opacity: op, cssClip: gC.checked });
+
+    var c = composite.ctx;
+    c.clearRect(0, 0, W, H);
+    c.fillStyle = '#eef0f4';
+    c.fillRect(0, 0, W, H);
+    c.drawImage(shadowLayer.el, 0, 0);
+    roundPath(c, CX, CY, CW, CH, r);
+    c.fillStyle = '#ffffff';
+    c.fill();
+
+    gapCtx.clearRect(0, 0, W, H);
+    gapCtx.drawImage(composite.el, 0, 0);
+    drawLoupe(gapCtx, composite, CX + r / 2, CY + r / 2, 3);
+  }
+  function queueGap() {
+    if (gapQueued) return;
+    gapQueued = true;
+    requestAnimationFrame(drawGap);
+  }
+  [[gR, oR], [gB, oB], [gS, oS], [gO, oO]].forEach(function (p) {
+    p[0].addEventListener('input', function () { p[1].textContent = p[0].value; queueGap(); });
+  });
+  gC.addEventListener('change', queueGap);
+
+  /* ---------- 演示 2 ---------- */
+  var cvClip = document.getElementById('cvClip');
+  cvClip.width = W * DPR; cvClip.height = H * DPR;
+  cvClip.style.width = '100%'; cvClip.style.height = 'auto';
+  var clipCtx = cvClip.getContext('2d');
+  clipCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+  var cM = document.getElementById('iM'), cB = document.getElementById('iB2');
+  var cShow = document.getElementById('iShow');
+  var oM = document.getElementById('oM'), oB2 = document.getElementById('oB2');
+
+  function drawClip() {
+    var margin = +cM.value, blur = +cB.value;
+    var need = padOf(oddKernel(blur));
+
+    buildShadow({ x: CX, y: CY, r: 16, blur: blur, spread: 0,
+                  offsetX: 0, offsetY: 6, opacity: 150, cssClip: true });
+
+    var c = composite.ctx;
+    c.clearRect(0, 0, W, H);
+    c.fillStyle = '#eef0f4';
+    c.fillRect(0, 0, W, H);
+    c.drawImage(shadowLayer.el, 0, 0);
+    roundPath(c, CX, CY, CW, CH, 16);
+    c.fillStyle = '#ffffff';
+    c.fill();
+
+    var wx = CX - margin, wy = CY - margin;
+    var ww = CW + margin * 2, wh = CH + margin * 2;
+
+    clipCtx.clearRect(0, 0, W, H);
+    clipCtx.save();
+    clipCtx.beginPath();
+    clipCtx.rect(wx, wy, ww, wh);
+    clipCtx.clip();
+    clipCtx.drawImage(composite.el, 0, 0);
+    clipCtx.restore();
+
+    if (cShow.checked) {
+      clipCtx.save();
+      clipCtx.strokeStyle = 'rgba(47,111,237,.55)';
+      clipCtx.setLineDash([5, 5]);
+      clipCtx.lineWidth = 1;
+      clipCtx.strokeRect(wx + .5, wy + .5, ww - 1, wh - 1);
+      clipCtx.restore();
+    }
+
+    clipCtx.save();
+    clipCtx.fillStyle = margin >= need ? 'rgba(21,23,28,.42)' : 'rgba(196,58,58,.72)';
+    clipCtx.font = '13px -apple-system, "PingFang SC", sans-serif';
+    clipCtx.fillText(
+      margin >= need
+        ? '外扩 ' + margin + 'px ≥ 需要 ' + need + 'px，完整'
+        : '外扩 ' + margin + 'px < 需要 ' + need + 'px，被裁',
+      28, H - 26);
+    clipCtx.restore();
+  }
+
+  cM.addEventListener('input', function () { oM.textContent = cM.value; requestAnimationFrame(drawClip); });
+  cB.addEventListener('input', function () { oB2.textContent = cB.value; requestAnimationFrame(drawClip); });
+  cShow.addEventListener('change', function () { requestAnimationFrame(drawClip); });
+
+  drawGap();
+  drawClip();
+})();
+</script>
+</body>
+</html>

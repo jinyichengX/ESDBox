@@ -33,15 +33,16 @@ void tablelamp_render(struct ipgui_widget * widget, ipgui_widget_render_ctx_t * 
     box_style.left_bottom_radius = 10;
     box_style.right_bottom_radius = 10;
 
-    ipgui_box_shadow_style_t shadow_style;
+    ipgui_box_outer_shadow_style_t shadow_style;
     shadow_style.blur = 5;
     shadow_style.offset_x = 0;
     shadow_style.offset_y = 0;
     shadow_style.spread = 0;
     shadow_style.opacity = 100;
-    IPGUI_COLOR_SET(shadow_style.color, 255, IPGUI_COLOR_526);
+    shadow_style.paint.type = IPGUI_PAINT_COLOR;
+    IPGUI_COLOR_SET(shadow_style.paint.src.color, 255, IPGUI_COLOR_526);
 
-    // ipgui_draw_box_shadow(
+    // ipgui_draw_box_outer_shadow(
     //     ctx->surf,
     //     (ipgui_aabb_t *)0,
     //     &box,
