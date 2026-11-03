@@ -140,7 +140,7 @@ __IPGUI_API__ ipgui_aabb_t ipgui_calc_image_transformed_aabb_rel_to_pivot(
         p_vec[i].y = trans->c * v_x + trans->d * v_y;
     }
     /* generate aabb(rel to pivot) */
-    ipgui_aabb_generate_with_points(&aabb_trans, p_vec, 4);
+    ipgui_aabb_generate_with_points(&aabb_trans, (ipgui_point_t *)p_vec, 4);
     ipgui_aabb_expand_integer(&aabb_trans, &img_aabb);
 
     return img_aabb;
