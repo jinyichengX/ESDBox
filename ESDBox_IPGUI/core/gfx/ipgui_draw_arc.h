@@ -42,7 +42,20 @@ extern __IPGUI_API__ void ipgui_draw_arc(
     ipgui_aabb_t      * clip,
     ipgui_arc_t       * arc,
     ipgui_arc_style_t * style);
-    
+
+extern __IPGUI_API__ void ipgui_draw_arc_thin(
+    ipgui_surf_t       * surf,
+    ipgui_aabb_t       * clip,
+    ipgui_coord_t        cx,                   /* 圆心x                         */
+    ipgui_coord_t        cy,                   /* 圆心y                         */
+    ipgui_coord_t        r,                    /* 半径                          */
+    ipgui_arc_angle_t    start,                /* 绘制起始角度                   */
+    ipgui_arc_draw_dir_t dir,                  /* 绘制方向 cw：顺时针 ccw：逆时针 */
+    u16_t                angle,                /* 绘制角度                      */
+    ipgui_color_t        color,
+    u8_t                 opacity,
+    ipgui_blend_mode_t   blend_mode);
+
 #ifdef __cplusplus
 }
 #endif

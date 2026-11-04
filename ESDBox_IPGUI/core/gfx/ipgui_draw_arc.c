@@ -463,3 +463,211 @@ static void draw_round_cap(
     circle_style.paint    = style->paint;
     ipgui_draw_arc(surf, (ipgui_aabb_t *)0, &circle, &circle_style);
 }
+
+/*
+ * 卦限 [oct*45, oct*45+45] 与 CCW 弧 [sa, ea]（ea 可 >360）的关系：
+ * 0=不相交跳过, 1=完全覆盖, 2=部分覆盖（需半平面判定）
+ */
+__IPGUI_STATIC__ u8_t thin_arc_octant_status(
+    int               oct,
+    ipgui_arc_angle_t sa,
+    ipgui_arc_angle_t ea)
+{
+    ipgui_arc_angle_t a0 = (ipgui_arc_angle_t)(oct * 45);
+    ipgui_arc_angle_t a1 = a0 + 45;
+    ipgui_arc_angle_t b0, b1;
+
+    /* 与 [sa, ea] 直接比；必要时再比 +360 镜像 */
+    if (a1 >= sa && a0 <= ea) {
+        if (a0 >= sa && a1 <= ea)
+            return 1;
+        return 2;
+    }
+    b0 = a0 + 360;
+    b1 = a1 + 360;
+    if (b1 >= sa && b0 <= ea) {
+        if (b0 >= sa && b1 <= ea)
+            return 1;
+        return 2;
+    }
+    return 0;
+}
+
+extern premult_blend_func_t premult_blend_table[PIX_FMT_MAX];
+
+/*
+ * Wu 细圆弧：Bresenham 八分增量 + 径向 AA。
+ * 角度裁剪用端点半平面（叉积），卦限掩码跳过无关卦；无逐点 atan2 / ring mask。
+ */
+__IPGUI_API__ void ipgui_draw_arc_thin(
+    ipgui_surf_t       * surf,
+    ipgui_aabb_t       * clip,
+    ipgui_coord_t        cx,                   /* 圆心x                         */
+    ipgui_coord_t        cy,                   /* 圆心y                         */
+    ipgui_coord_t        r,                    /* 半径                          */
+    ipgui_arc_angle_t    start,                /* 绘制起始角度                   */
+    ipgui_arc_draw_dir_t dir,                  /* 绘制方向 cw：顺时针 ccw：逆时针 */
+    u16_t                angle,                /* 绘制角度                      */
+    ipgui_color_t        color,
+    u8_t                 opacity,
+    ipgui_blend_mode_t   blend_mode)
+{
+    ipgui_aabb_t draw, self;
+    ipgui_arc_angle_t start_angle, end_angle, sa_n, ea_n;
+    u16_t arc_angle;
+    premult_blend_func_t blend_func;
+    ipgui_color_t pm_main, pm_side;
+    u8_t oct[8];
+    s32_t cs, ss, ce, se;
+    s32_t x, y, err, t;
+    u8_t full_circle;
+    u8_t wide_arc; /* 张角 > 180：半平面用 OR，否则 AND */
+    int i;
+
+    if ((!surf) || (r <= 0) || (angle == 0) || (opacity < 3))
+        return;
+
+    blend_func = premult_blend_table[surf->pix_fmt];
+    if (!blend_func)
+        return;
+
+    if (clip) {
+        if (0 != ipgui_aabb_overlap(&draw, clip, &surf->surf))
+            return;
+    } else {
+        draw = surf->surf;
+    }
+
+    self.start.x = cx - r - 1;
+    self.end.x   = cx + r + 1;
+    self.start.y = cy - r - 1;
+    self.end.y   = cy + r + 1;
+    if (0 != ipgui_aabb_overlap(&draw, &self, &draw))
+        return;
+
+    arc_angle = angle;
+    if (arc_angle > 359)
+        arc_angle = 360;
+
+    start_angle = start;
+    while (start_angle < 0)    start_angle += 360;
+    while (start_angle >= 360) start_angle -= 360;
+
+    if (dir == IPGUI_ARC_DRAW_DIR_CW) {
+        end_angle = start_angle;
+        start_angle = start_angle - (ipgui_arc_angle_t)arc_angle;
+        while (start_angle < 0) {
+            start_angle += 360;
+            end_angle   += 360;
+        }
+    } else {
+        end_angle = start_angle + (ipgui_arc_angle_t)arc_angle;
+    }
+
+    full_circle = (arc_angle >= 360) ? 1 : 0;
+    wide_arc = (arc_angle > 180) ? 1 : 0;
+
+    if (full_circle) {
+        for (i = 0; i < 8; i ++)
+            oct[i] = 1;
+        cs = ss = ce = se = 0;
+    } else {
+        for (i = 0; i < 8; i ++)
+            oct[i] = thin_arc_octant_status(i, start_angle, end_angle);
+
+        sa_n = start_angle;
+        while (sa_n >= 360) sa_n -= 360;
+        ea_n = end_angle;
+        while (ea_n >= 360) ea_n -= 360;
+
+        cs = ipgui_cos(sa_n); ss = ipgui_sin(sa_n);
+        ce = ipgui_cos(ea_n); se = ipgui_sin(ea_n);
+    }
+
+#define THIN_IN_ARC(px, py) \
+    (wide_arc \
+        ? (((cs * (s32_t)(py) - ss * (s32_t)(px)) >= 0) || \
+           (((s32_t)(px) * se - (s32_t)(py) * ce) >= 0)) \
+        : (((cs * (s32_t)(py) - ss * (s32_t)(px)) >= 0) && \
+           (((s32_t)(px) * se - (s32_t)(py) * ce) >= 0)))
+
+#define THIN_PLOT(X, Y, PM) do { \
+    if (ipgui_point_in_aabb((X), (Y), &draw)) { \
+        u8_t * __cr = ipgui_surf_color_get(surf, \
+            (X) - surf->surf.start.x, (Y) - surf->surf.start.y); \
+        blend_func((PM), __cr, blend_mode); \
+    } \
+} while (0)
+
+#define THIN_OCT(oi, px, py, qx, qy) do { \
+    if (oct[oi]) { \
+        if (oct[oi] == 1 || THIN_IN_ARC(px, py)) \
+            THIN_PLOT(cx + (px), cy + (py), pm_main); \
+        if (have_side && (oct[oi] == 1 || THIN_IN_ARC(qx, qy))) \
+            THIN_PLOT(cx + (qx), cy + (qy), pm_side); \
+    } \
+} while (0)
+
+    /* Midpoint/Bresenham 八分：err = x^2 + y^2 - r^2 */
+    x = r;
+    y = 0;
+    err = 0;
+
+    while (x >= y) {
+        s32_t den = (x << 1) + 1;
+        s32_t eabs = IPGUI_ABS(err);
+        u8_t cover_main, cover_side;
+        s32_t x_side;
+        u8_t have_side;
+        u8_t am, as;
+
+        if (eabs >= den)
+            eabs = den - 1;
+        cover_side = (u8_t)((eabs * 255) / den);
+        cover_main = (u8_t)(255 - cover_side);
+        x_side = (err > 0) ? (x - 1) : (x + 1);
+        if (x_side < 0)
+            x_side = 0;
+
+        am = (u8_t)(((u16_t)cover_main * opacity) >> 8);
+        as = (u8_t)(((u16_t)cover_side * opacity) >> 8);
+        pm_main = ipgui_color_combine_opacity_and_premultiply(&color, am);
+        have_side = (as >= 3 && x_side != x) ? 1 : 0;
+        if (have_side)
+            pm_side = ipgui_color_combine_opacity_and_premultiply(&color, as);
+
+        /* 8 卦对称；y==0 / x==y 去重 */
+        if (y == 0) {
+            THIN_OCT(0,  x,  0,  x_side,  0);
+            THIN_OCT(1,  0,  x,  0,  x_side);
+            THIN_OCT(3, -x,  0, -x_side,  0);
+            THIN_OCT(5,  0, -x,  0, -x_side);
+        } else if (x == y) {
+            THIN_OCT(0,  x,  y,  x_side,  y);
+            THIN_OCT(2, -y,  x, -y,  x_side);
+            THIN_OCT(4, -x, -y, -x_side, -y);
+            THIN_OCT(6,  y, -x,  y, -x_side);
+        } else {
+            THIN_OCT(0,  x,  y,  x_side,  y);
+            THIN_OCT(1,  y,  x,  y,  x_side);
+            THIN_OCT(2, -y,  x, -y,  x_side);
+            THIN_OCT(3, -x,  y, -x_side,  y);
+            THIN_OCT(4, -x, -y, -x_side, -y);
+            THIN_OCT(5, -y, -x, -y, -x_side);
+            THIN_OCT(6,  y, -x,  y, -x_side);
+            THIN_OCT(7,  x, -y,  x_side, -y);
+        }
+
+        err += (y << 1) + 1;
+        y ++;
+        t = err - ((x << 1) - 1);
+        if (IPGUI_ABS(t) < IPGUI_ABS(err)) {
+            err = t;
+            x --;
+        }
+    }
+
+#undef THIN_IN_ARC
+#undef THIN_PLOT
+#undef THIN_OCT
+}
