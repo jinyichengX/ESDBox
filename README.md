@@ -1,8 +1,17 @@
-# IPGUI 使用手册
+# IPGUI 使用手册（20260823更新）
 
 IPGUI 是一套面向嵌入式系统的轻量级 GUI 框架，包含完整的绘图库、控件系统、输入分发、动画系统与屏幕驱动抽象。本手册覆盖：目录结构、移植步骤、系统初始化与主循环、控件 API、动画系统、绘图 API 参考及完整示例。
 
 ---
+## demo
+平台1：STM32板卡
+<img width="1279" height="1706" alt="f3e243f7814968c229bfb0843a7f20c5" src="https://github.com/user-attachments/assets/32b62f53-7c2d-43ba-b559-f172ad7c98fb" />
+
+平台2 i.MX6U板卡
+https://github.com/user-attachments/assets/526d786a-7cdf-415e-93cd-566b23a5d4fe
+
+平台3：SDL2
+
 
 ## 目录
 
