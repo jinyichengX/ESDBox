@@ -5,7 +5,7 @@ IPGUI 是一套面向嵌入式系统的轻量级 GUI 框架，包含完整的绘
 ---
 ## demo
 平台1：STM32板卡
-<img width="1279" height="1706" alt="f3e243f7814968c229bfb0843a7f20c5" src="https://github.com/user-attachments/assets/32b62f53-7c2d-43ba-b559-f172ad7c98fb" />
+<img width="640" height="853" alt="f3e243f7814968c229bfb0843a7f20c5" src="https://github.com/user-attachments/assets/32b62f53-7c2d-43ba-b559-f172ad7c98fb" />
 
 平台2 i.MX6U板卡
 https://github.com/user-attachments/assets/526d786a-7cdf-415e-93cd-566b23a5d4fe
