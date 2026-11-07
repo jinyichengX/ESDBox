@@ -11,6 +11,7 @@ IPGUI 是一套面向嵌入式系统的轻量级 GUI 框架，包含完整的绘
 https://github.com/user-attachments/assets/526d786a-7cdf-415e-93cd-566b23a5d4fe
 
 平台3：SDL2
+<img width="802" height="507" alt="0e8834add9d40863bea9b0c0b96cd363" src="https://github.com/user-attachments/assets/8fac0674-9787-49cc-bdbe-9446d18c0142" />
 
 
 ## 目录
