@@ -9,7 +9,9 @@ ESDBox_IPGUI是一套面向嵌入式系统的轻量级 GUI 框架，包含完整
 
 <img width="640" height="853" alt="f3e243f7814968c229bfb0843a7f20c5" src="https://github.com/user-attachments/assets/32b62f53-7c2d-43ba-b559-f172ad7c98fb" />
 
-https://github.com/user-attachments/assets/23de4f86-1820-44dd-abe7-4ee350a44ea6
+
+https://github.com/user-attachments/assets/a803f5e3-f3d6-406a-acba-20efd1d83370
+
 
 平台2 i.MX6U板卡
 
