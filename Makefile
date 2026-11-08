@@ -11,7 +11,7 @@
 
 BUILD_INFO := =============== Build OK!! Author: JinYiCheng  ===============
 
-target = test
+target = ESDBox
 
 executable_suffix := .exe
 

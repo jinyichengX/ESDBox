@@ -1,0 +1,1494 @@
+#include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "SDL.h"
+#include "sdl_draw.h"
+#include "sdl_input_event.h"
+
+#include "ipgui_screen.h"
+#include "ipgui_widget.h"
+#include "ipgui_grid.h"
+#include "ipgui_input_dispatcher.h"
+#include "ipgui_blend.h"
+#include "ipgui_pattle.h"
+#include "ipgui_draw_arc.h"
+#include "ipgui_image.h"
+#include "ipgui_draw_image_api.h"
+#include "ipgui_draw_pixel.h"
+#include "ipgui_time.h"
+#include "ipgui_animation.h"
+#include "ipgui_draw_icon.h"
+#include "ipgui_draw_box_background.h"
+#include "ipgui_draw_box_shadow.h"
+#include "ipgui_blur.h"
+#include "ipgui_page_emoto.h"
+#include "ipgui_page_emoto_nav.h"
+#include "ipgui_memory.h"
+#include <math.h>
+#undef main
+
+extern __IPGUI_API__ ipgui_err_t ipgui_sdl_mouse_event_poll(void * priv_data, ipgui_input_src_evt_t * raw_evt);
+
+ipgui_input_dispatcher_t dispatcher;
+ipgui_input_src_t pointer_src;
+ipgui_input_src_t keyboard_src;
+ipgui_scr_t main_screen;
+ipgui_input_src_id_t pointer_id;
+ipgui_input_src_id_t keyboard_id;
+ipgui_scr_id_t main_scr_id;
+
+ipgui_scr_drv_t sdl_drv = {
+    .xreso = 800,
+    .yreso = 480,
+    
+    .pri_data    = &g_sdl_private,
+    .put_pixel   = sdl_put_pixel,
+    .fill_region = sdl_fill_region,
+    // .close       = sdl_exit,
+    .flush       = sdl_flush,
+};
+
+static u8_t main_screen_frame_buf[800 * 4 * 480];
+
+void draw_main_screen_backgroud_color(ipgui_scr_t * scr, ipgui_surf_t * surf)
+{
+    // ipgui_color_t backgroud_color;
+    // IPGUI_COLOR_SET(backgroud_color, 255, 0xfffffff);
+    // ipgui_blend_color(surf, (ipgui_aabb_t *)0, &surf->surf, backgroud_color, 100 , NULL, NULL, IPGUI_BLEND_NORMAL);
+
+    ipgui_paint_t paint;
+    paint.type = IPGUI_PAINT_GRADIENT;
+    paint.src.grad_src.grad_type = IPGUI_GRADIENT_TYPE_LINEAR;
+
+    ipgui_liner_gradient_init_direct(&paint.src.grad_src.grad.liner_grad, 
+        0, 0, 799, 0);
+    ipgui_gradient_color_stop_t stop1;
+    stop1.pos = 0;
+    IPGUI_COLOR_SET(stop1.color, 255, 0x2e317c);
+    ipgui_gradient_color_stop_t stop2;
+    stop2.pos = 255;
+    IPGUI_COLOR_SET(stop2.color, 255, 0x806d9e);
+    ipgui_liner_gradient_add_stop(&paint.src.grad_src.grad.liner_grad, &stop1);
+    ipgui_liner_gradient_add_stop(&paint.src.grad_src.grad.liner_grad, &stop2);
+
+    ipgui_blend(surf, (ipgui_aabb_t *)0, &surf->surf, &paint, 255 , NULL, NULL, IPGUI_BLEND_NORMAL);
+}
+extern void widget1_render(struct ipgui_widget * widget, ipgui_widget_render_ctx_t * ctx);
+extern void widget2_render(struct ipgui_widget * widget, ipgui_widget_render_ctx_t * ctx);
+extern void widget3_render(struct ipgui_widget * widget, ipgui_widget_render_ctx_t * ctx);
+extern void widget4_render(struct ipgui_widget * widget, ipgui_widget_render_ctx_t * ctx);
+extern void knob_circle_render(struct ipgui_widget * widget, ipgui_widget_render_ctx_t * ctx);
+extern void knob_circle_event_handler(struct ipgui_widget * widget, ipgui_widget_evt_t * evt);
+extern void widget_knob_update(ipgui_widget_t * w);
+extern void brightness_label_render(struct ipgui_widget * widget, ipgui_widget_render_ctx_t * ctx);
+extern void widget_wave_update(ipgui_widget_t * w);
+extern void widget_switch_render(struct ipgui_widget * widget, ipgui_widget_render_ctx_t * ctx);
+extern void widget_switch_label_render(struct ipgui_widget * widget, ipgui_widget_render_ctx_t * ctx);
+extern void widget_arc_label_render(struct ipgui_widget * widget, ipgui_widget_render_ctx_t * ctx);
+extern void power_render(struct ipgui_widget * widget, ipgui_widget_render_ctx_t * ctx);
+extern void tablelamp_render(struct ipgui_widget * widget, ipgui_widget_render_ctx_t * ctx);
+extern void tablelamp_event_handler(struct ipgui_widget * widget, ipgui_widget_evt_t * evt);
+extern void widget_tablelamp_update(ipgui_widget_t * w);
+extern void arc_bg_render(struct ipgui_widget * widget, ipgui_widget_render_ctx_t * ctx);
+extern void _label_livingroom_render(struct ipgui_widget * widget, ipgui_widget_render_ctx_t * ctx);
+extern void livingroom_event_handler(struct ipgui_widget * widget, ipgui_widget_evt_t * evt);
+extern void widget_livingroom_update(ipgui_widget_t * w);
+extern void widget_switch_event_handler(struct ipgui_widget * widget, ipgui_widget_evt_t * evt);
+extern void widget_switch_update(ipgui_widget_t * w);
+extern void widget_switch_label_update(ipgui_widget_t * w);
+extern void curve_render(struct ipgui_widget * widget, ipgui_widget_render_ctx_t * ctx);
+extern void widget_curve_update(ipgui_widget_t * w);
+ipgui_image_data_t wave_img;
+ipgui_image_data_t main_bg_img;
+ipgui_image_data_t power_img;
+ipgui_image_data_t tablelamp_img;
+ipgui_image_data_t tablelamp_on_img;
+
+#include "icon_play.h"
+#include "open_sans.h"
+#include "quicksand_medium.h"
+#include "ipgui_draw_builtin_font.h"
+
+
+/* ========== 测试：滚动 vs 拖拽 ========== */
+typedef struct { u8_t r, g, b; } widget_color_t;
+
+static widget_color_t col_blue   = {0x4a, 0x90, 0xd9};
+static widget_color_t col_red    = {0xe0, 0x5d, 0x5d};
+static widget_color_t col_green  = {0x5d, 0xb8, 0x5d};
+static widget_color_t col_orange = {0xf0, 0x8a, 0x3a};
+static widget_color_t col_purple = {0x9b, 0x59, 0xb6};
+static widget_color_t col_gray   = {0x99, 0x99, 0x99};
+
+/* 通用颜色块渲染 */
+void color_render(ipgui_widget_t * w, ipgui_widget_render_ctx_t * ctx)
+{
+    widget_color_t * c = (widget_color_t *)w->priv_data;
+    ipgui_aabb_t box = {{0,0},{w->w - 1, w->h - 1}};
+    ipgui_box_style_t s; ipgui_memset(&s, 0, sizeof(s));
+    s.left_top_radius = s.right_top_radius = s.left_bottom_radius = s.right_bottom_radius = 12;
+    ipgui_box_bg_style_t bg;
+    bg.paint.type = IPGUI_PAINT_COLOR;
+    u32_t rgb = ((u32_t)c->r << 16) | ((u32_t)c->g << 8) | c->b;
+    IPGUI_COLOR_SET(bg.paint.src.color, 255, rgb);
+    bg.opacity = 100; bg.blend_mode = IPGUI_BLEND_NORMAL;
+    ipgui_draw_box_background(ctx->surf, NULL, &box, &s, &bg);
+
+    /* 居中绘制控件名 */
+    if (w->name) {
+        ipgui_font_style_t fs;
+        ipgui_memset(&fs, 0, sizeof(fs));
+        fs.font = &open_sans_18px;
+        fs.paint.type = IPGUI_PAINT_COLOR;
+        IPGUI_COLOR_SET(fs.paint.src.color, 255, 0xFFFFFF);
+        fs.opacity = 220;
+        fs.blend_mode = IPGUI_BLEND_NORMAL;
+
+        ipgui_coord_t tw = ipgui_builtin_text_width(fs.font, (const s8_t *)w->name);
+        ipgui_coord_t tx = ((w->w - 1) - tw) / 2;
+        ipgui_coord_t ty = ((w->h - 1) - fs.font->line_height) / 2;
+        ipgui_draw_builtin_text(ctx->surf, NULL, &fs, (const s8_t *)w->name, tx, ty);
+    }
+}
+
+/* ===== 阴影用例页：一屏铺多个不同参数的阴影，方便横向对比 ===== */
+typedef struct {
+    ipgui_coord_t blur;
+    ipgui_coord_t spread;
+    ipgui_coord_t offset_x;
+    ipgui_coord_t offset_y;
+    u8_t          opacity;
+    u8_t          use_gradient;
+    u32_t         color;
+    ipgui_coord_t r_lt, r_rt, r_lb, r_br;
+    ipgui_coord_t cx, cy;          /* 卡片在全屏控件内的位置 */
+    const s8_t  * label;
+} shadow_case_t;
+
+static shadow_case_t shadow_cases[] = {
+    {  8, 0,  0,  0,  70, 0, 0x000000, 12,12,12,12,  30, 60, "blur 8"    },
+    { 28, 0,  0,  0, 100, 0, 0x000000, 12,12,12,12, 220, 60, "blur 28"   },
+    { 10, 10, 0,  0,  90, 0, 0x000000, 12,12,12,12, 410, 60, "spread 10" },
+    { 12, 0, 12, 12, 110, 0, 0x000000, 12,12,12,12, 600, 60, "offset 12" },
+    { 16, 0,  0,  0, 150, 0, 0x2f6fed, 12,12,12,12,  30,235, "blue"      },
+    { 14, 0,  0,  0,  90, 0, 0x000000,  4,24,32,12, 220,235, "4 radii"   },
+    { 18, 0,  0,  0,  90, 0, 0x000000, 40,40,40,40, 410,235, "radius 40" },
+    { 20, 0,  0,  0, 255, 1, 0x000000, 12,12,12,12, 600,235, "gradient"  },
+};
+
+static void draw_one_shadow_case(ipgui_widget_render_ctx_t * ctx, shadow_case_t * c)
+{
+    ipgui_aabb_t box = {{c->cx, c->cy}, {c->cx + 149, c->cy + 119}};
+
+    ipgui_box_style_t s; ipgui_memset(&s, 0, sizeof(s));
+    s.left_top_radius     = c->r_lt;
+    s.right_top_radius    = c->r_rt;
+    s.left_bottom_radius  = c->r_lb;
+    s.right_bottom_radius = c->r_br;
+
+    ipgui_box_outer_shadow_style_t sh; ipgui_memset(&sh, 0, sizeof(sh));
+    if (c->use_gradient) {
+        sh.paint.type = IPGUI_PAINT_GRADIENT;
+        sh.paint.src.grad_src.grad_type = IPGUI_GRADIENT_TYPE_LINEAR;
+        ipgui_liner_gradient_init_direct(&sh.paint.src.grad_src.grad.liner_grad,
+            0, 0, 799, 0);
+        ipgui_gradient_color_stop_t a; a.pos = 0;
+        IPGUI_COLOR_SET(a.color, 255, 0xff5a5a);
+        ipgui_gradient_color_stop_t b; b.pos = 255;
+        IPGUI_COLOR_SET(b.color, 255, 0x4a7bff);
+        ipgui_liner_gradient_add_stop(&sh.paint.src.grad_src.grad.liner_grad, &a);
+        ipgui_liner_gradient_add_stop(&sh.paint.src.grad_src.grad.liner_grad, &b);
+    } else {
+        sh.paint.type = IPGUI_PAINT_COLOR;
+        IPGUI_COLOR_SET(sh.paint.src.color, 255, c->color);
+    }
+    sh.opacity  = c->opacity;
+    sh.blur     = c->blur;
+    sh.spread   = c->spread;
+    sh.offset_x = c->offset_x;
+    sh.offset_y = c->offset_y;
+    ipgui_draw_box_outer_shadow(ctx->surf, NULL, &box, &s, &sh);
+
+    ipgui_box_bg_style_t bg; ipgui_memset(&bg, 0, sizeof(bg));
+    bg.paint.type = IPGUI_PAINT_COLOR;
+    IPGUI_COLOR_SET(bg.paint.src.color, 255, 0xFAFAFA);
+    bg.opacity    = 255;
+    bg.blend_mode = IPGUI_BLEND_NORMAL;
+    ipgui_draw_box_background(ctx->surf, NULL, &box, &s, &bg);
+
+    if (c->label) {
+        ipgui_font_style_t fs; ipgui_memset(&fs, 0, sizeof(fs));
+        fs.font = &open_sans_11px;
+        fs.paint.type = IPGUI_PAINT_COLOR;
+        IPGUI_COLOR_SET(fs.paint.src.color, 255, 0x556070);
+        fs.opacity    = 255;
+        fs.blend_mode = IPGUI_BLEND_NORMAL;
+        ipgui_coord_t tw = ipgui_builtin_text_width(fs.font, c->label);
+        ipgui_draw_builtin_text(ctx->surf, NULL, &fs, c->label,
+            c->cx + (150 - tw) / 2, c->cy + 120 - 22);
+    }
+}
+
+/* 一个全屏控件里画完所有用例：
+ * 阴影会扩展出控件本体之外，控件必须留够绘制区域，否则会被裁掉 */
+static void shadow_cases_render(ipgui_widget_t * w, ipgui_widget_render_ctx_t * ctx)
+{
+    (void)w;
+    for (int i = 0; i < (int)(sizeof(shadow_cases) / sizeof(shadow_cases[0])); i ++) {
+        draw_one_shadow_case(ctx, &shadow_cases[i]);
+    }
+}
+
+/* 用例页的底板：浅灰底 + 标题，让阴影对比不受壁纸干扰 */
+static void shadow_page_bg_render(ipgui_widget_t * w, ipgui_widget_render_ctx_t * ctx)
+{
+    ipgui_aabb_t box = {{0, 0}, {w->w - 1, w->h - 1}};
+    ipgui_box_style_t s; ipgui_memset(&s, 0, sizeof(s));
+    ipgui_box_bg_style_t bg; ipgui_memset(&bg, 0, sizeof(bg));
+    bg.paint.type = IPGUI_PAINT_COLOR;
+    IPGUI_COLOR_SET(bg.paint.src.color, 255, 0xEDEDF2);
+    bg.opacity    = 255;
+    bg.blend_mode = IPGUI_BLEND_NORMAL;
+    ipgui_draw_box_background(ctx->surf, NULL, &box, &s, &bg);
+
+    ipgui_font_style_t fs; ipgui_memset(&fs, 0, sizeof(fs));
+    fs.font = &open_sans_18px;
+    fs.paint.type = IPGUI_PAINT_COLOR;
+    IPGUI_COLOR_SET(fs.paint.src.color, 255, 0x445066);
+    fs.opacity    = 255;
+    fs.blend_mode = IPGUI_BLEND_NORMAL;
+    ipgui_draw_builtin_text(ctx->surf, NULL, &fs, "BOX SHADOW CASES", 30, 20);
+}
+    // ipgui_aabb_t clip_shadow = {{0,0},{0,0}};
+/* ===== 阴影验证例子 ===== */
+static void shadow_demo_render(ipgui_widget_t * w, ipgui_widget_render_ctx_t * ctx)
+{
+    (void)w;
+    ipgui_aabb_t box = {{40 + 200, 40}, {159 + 200, 159}};
+    ipgui_box_style_t s; ipgui_memset(&s, 0, sizeof(s));
+    s.left_top_radius    = 4;
+    s.right_top_radius   = 24;
+    s.left_bottom_radius = 32;
+    s.right_bottom_radius = 12;
+
+    ipgui_paint_t paint;
+    paint.type = IPGUI_PAINT_GRADIENT;
+    paint.src.grad_src.grad_type = IPGUI_GRADIENT_TYPE_LINEAR;
+
+    ipgui_liner_gradient_init_direct(&paint.src.grad_src.grad.liner_grad, 
+        0, 0, 799, 0);
+    ipgui_gradient_color_stop_t stop1;
+    stop1.pos = 0;
+    IPGUI_COLOR_SET(stop1.color, 255, 0x597821);
+    ipgui_gradient_color_stop_t stop2;
+    stop2.pos = 255;
+    IPGUI_COLOR_SET(stop2.color, 255, 0xf0631e);
+    ipgui_liner_gradient_add_stop(&paint.src.grad_src.grad.liner_grad, &stop1);
+    ipgui_liner_gradient_add_stop(&paint.src.grad_src.grad.liner_grad, &stop2);
+
+    ipgui_box_outer_shadow_style_t sh;
+    ipgui_memset(&sh, 0, sizeof(sh));
+    // sh.paint.type = IPGUI_PAINT_COLOR;
+    // IPGUI_COLOR_SET(sh.paint.src.color, 255, 0xFF0000);
+    sh.paint = paint;
+    sh.opacity  = 255;
+    sh.blur     = 12;
+    sh.spread   = 30;
+    sh.offset_x = 50;
+    sh.offset_y = 0;
+
+    ipgui_aabb_t clip_shadow;
+    clip_shadow.start.x = 0;
+    clip_shadow.start.y = 0;
+    clip_shadow.end.x = 400;
+    clip_shadow.end.y = 100;
+    ipgui_draw_box_outer_shadow(ctx->surf, &clip_shadow, &box, &s, &sh);
+
+    ipgui_box_bg_style_t bg;
+    bg.paint.type = IPGUI_PAINT_COLOR;
+    IPGUI_COLOR_SET(bg.paint.src.color, 255, 0xF0F0F0);
+    bg.opacity = 255;
+    bg.blend_mode = IPGUI_BLEND_NORMAL;
+
+
+
+    ipgui_draw_box_background(ctx->surf, NULL, &box, &s, &bg);
+}
+
+// /* 滚动事件处理：修改触发控件的 scroll_x/y */
+// void scroll_handler(ipgui_widget_t * w, ipgui_widget_evt_t * e)
+// {
+//     if (e->type != IPGUI_WIDGET_EVENT_PRESSED) return;
+//     ipgui_coord_t dx = e->evt.pressed_evt.x - e->evt.pressed_evt.last_press_x;
+//     ipgui_coord_t dy = e->evt.pressed_evt.y - e->evt.pressed_evt.last_press_y;
+//     if (dx == 0 && dy == 0) return;
+//     w->scroll_x -= dx;
+//     w->scroll_y -= dy;
+//     ipgui_widget_mark_dirty(w);
+// }
+
+// /* 滚动 + 拖拽处理：拖拽时同时驱动内容滚动和控件位移，wid1 专用 */
+// void scroll_drag_handler(ipgui_widget_t * w, ipgui_widget_evt_t * e)
+// {
+//     if (e->type != IPGUI_WIDGET_EVENT_PRESSED) return;
+//     ipgui_coord_t dx = e->evt.pressed_evt.x - e->evt.pressed_evt.last_press_x;
+//     ipgui_coord_t dy = e->evt.pressed_evt.y - e->evt.pressed_evt.last_press_y;
+//     if (dx == 0 && dy == 0) return;
+
+//     /* 滚动: 驱动子控件内容 */
+//     w->scroll_x -= dx;
+//     w->scroll_y -= dy;
+
+//     /* 拖拽: 同时移动控件本身 */
+//     ipgui_widget_mark_dirty(w);
+//     w->x += dx;
+//     w->y += dy;
+//     ipgui_widget_mark_dirty(w);
+// }
+
+/* 拖拽事件处理：直接修改当前控件的 x/y */
+void drag_handler(ipgui_widget_t * w, ipgui_widget_evt_t * e)
+{
+    if (e->type != IPGUI_WIDGET_EVENT_PRESSED) return;
+    ipgui_coord_t dx = e->evt.pressed_evt.x - e->evt.pressed_evt.last_press_x;
+    ipgui_coord_t dy = e->evt.pressed_evt.y - e->evt.pressed_evt.last_press_y;
+    if (dx == 0 && dy == 0) return;
+    /* 先标脏旧位置，再移动，再标脏新位置，避免旧位置残留 */
+    ipgui_widget_mark_dirty(w);
+    w->x += dx;
+    w->y += dy;
+    ipgui_widget_mark_dirty(w);
+}
+extern void ipgui_average_blur_hor(
+    ipgui_mask_surface_t * in,
+    ipgui_coord_t          kn_size, /* average blur kernel size */
+    ipgui_mask_surface_t * out);
+void blur_render(struct ipgui_widget * widget, ipgui_widget_render_ctx_t * ctx)
+{
+    static const unsigned char open_sans_25px_char_065_bitmap[] = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x23, 0xfe, 0xf4, 0x0d, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行 0 */
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x87, 0xff, 0xff, 0x65, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行 1 */
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0xe6, 0xd3, 0xf7, 0xc9, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行 2 */
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x50, 0xff, 0x7c, 0xb3, 0xff, 0x2d, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行 3 */
+    0x00, 0x00, 0x00, 0x00, 0x00, 0xb4, 0xff, 0x2c, 0x57, 0xff, 0x90, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行 4 */
+    0x00, 0x00, 0x00, 0x00, 0x1b, 0xfc, 0xcc, 0x00, 0x07, 0xed, 0xec, 0x07, 0x00, 0x00, 0x00, 0x00, /* 行 5 */
+    0x00, 0x00, 0x00, 0x00, 0x7d, 0xff, 0x67, 0x00, 0x00, 0x92, 0xff, 0x58, 0x00, 0x00, 0x00, 0x00, /* 行 6 */
+    0x00, 0x00, 0x00, 0x01, 0xdf, 0xf5, 0x0e, 0x00, 0x00, 0x2d, 0xff, 0xbc, 0x00, 0x00, 0x00, 0x00, /* 行 7 */
+    0x00, 0x00, 0x00, 0x46, 0xff, 0x9e, 0x00, 0x00, 0x00, 0x00, 0xca, 0xfe, 0x21, 0x00, 0x00, 0x00, /* 行 8 */
+    0x00, 0x00, 0x00, 0xab, 0xff, 0x3a, 0x00, 0x00, 0x00, 0x00, 0x66, 0xff, 0x83, 0x00, 0x00, 0x00, /* 行 9 */
+    0x00, 0x00, 0x14, 0xf9, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xe4, 0x03, 0x00, 0x00, /* 行10 */
+    0x00, 0x00, 0x73, 0xff, 0xe8, 0xe0, 0xe0, 0xe0, 0xe0, 0xe0, 0xe0, 0xf0, 0xff, 0x4b, 0x00, 0x00, /* 行11 */
+    0x00, 0x00, 0xd7, 0xfb, 0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x52, 0xff, 0xaf, 0x00, 0x00, /* 行12 */
+    0x00, 0x3c, 0xff, 0xb6, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0xee, 0xfb, 0x17, 0x00, /* 行13 */
+    0x00, 0xa1, 0xff, 0x5a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x99, 0xff, 0x76, 0x00, /* 行14 */
+    0x0f, 0xf5, 0xf3, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3c, 0xff, 0xd9, 0x00, /* 行15 */
+    0x6a, 0xff, 0xa2, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xde, 0xff, 0x3e, /* 行16 */
+    0xce, 0xff, 0x46, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x82, 0xff, 0xa2, /* 行17 */
+    };
+    static const unsigned char open_sans_25px_char_066_bitmap[] = {
+    0x8c, 0xff, 0xff, 0xff, 0xff, 0xfe, 0xf4, 0xe0, 0xb6, 0x6d, 0x0b, 0x00, 0x00, /* 行 0 */
+    0x8c, 0xff, 0xe7, 0xcc, 0xcc, 0xcd, 0xd7, 0xf5, 0xff, 0xff, 0xe2, 0x25, 0x00, /* 行 1 */
+    0x8c, 0xff, 0x88, 0x00, 0x00, 0x00, 0x00, 0x03, 0x45, 0xdb, 0xff, 0xc2, 0x00, /* 行 2 */
+    0x8c, 0xff, 0x88, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x33, 0xff, 0xff, 0x17, /* 行 3 */
+    0x8c, 0xff, 0x88, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf4, 0xff, 0x30, /* 行 4 */
+    0x8c, 0xff, 0x88, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b, 0xfe, 0xff, 0x16, /* 行 5 */
+    0x8c, 0xff, 0x88, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x59, 0xff, 0xc9, 0x00, /* 行 6 */
+    0x8c, 0xff, 0x88, 0x00, 0x00, 0x00, 0x05, 0x20, 0x6a, 0xf0, 0xe8, 0x30, 0x00, /* 行 7 */
+    0x8c, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf3, 0x7e, 0x18, 0x00, 0x00, /* 行 8 */
+    0x8c, 0xff, 0xe3, 0xc4, 0xc4, 0xc4, 0xc9, 0xdf, 0xfe, 0xf2, 0x9b, 0x18, 0x00, /* 行 9 */
+    0x8c, 0xff, 0x88, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1a, 0x98, 0xff, 0xe3, 0x16, /* 行10 */
+    0x8c, 0xff, 0x88, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xba, 0xff, 0x8a, /* 行11 */
+    0x8c, 0xff, 0x88, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x72, 0xff, 0xc3, /* 行12 */
+    0x8c, 0xff, 0x88, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x78, 0xff, 0xc4, /* 行13 */
+    0x8c, 0xff, 0x88, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc5, 0xff, 0x98, /* 行14 */
+    0x8c, 0xff, 0x88, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1a, 0x9f, 0xff, 0xfc, 0x30, /* 行15 */
+    0x8c, 0xff, 0xe3, 0xc4, 0xc4, 0xc4, 0xc7, 0xdc, 0xfe, 0xff, 0xf8, 0x5f, 0x00, /* 行16 */
+    0x8c, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf3, 0xd3, 0x92, 0x26, 0x00, 0x00, /* 行17 */
+};
+static const unsigned char open_sans_25px_char_067_bitmap[] = {
+    0x00, 0x00, 0x00, 0x00, 0x03, 0x55, 0xaa, 0xde, 0xf7, 0xfb, 0xeb, 0xc6, 0x89, 0x2f, 0x00, /* 行 0 */
+    0x00, 0x00, 0x00, 0x25, 0xd1, 0xff, 0xff, 0xfd, 0xea, 0xe8, 0xfe, 0xff, 0xff, 0xcc, 0x00, /* 行 1 */
+    0x00, 0x00, 0x38, 0xf0, 0xff, 0xda, 0x5b, 0x0f, 0x00, 0x00, 0x07, 0x3b, 0x95, 0x48, 0x00, /* 行 2 */
+    0x00, 0x0c, 0xdd, 0xff, 0xba, 0x0b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行 3 */
+    0x00, 0x89, 0xff, 0xe1, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行 4 */
+    0x03, 0xec, 0xff, 0x69, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行 5 */
+    0x35, 0xff, 0xfe, 0x13, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行 6 */
+    0x5f, 0xff, 0xdd, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行 7 */
+    0x72, 0xff, 0xc8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行 8 */
+    0x70, 0xff, 0xc7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行 9 */
+    0x5f, 0xff, 0xda, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行10 */
+    0x3b, 0xff, 0xfd, 0x0d, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行11 */
+    0x08, 0xf8, 0xff, 0x59, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行12 */
+    0x00, 0xa4, 0xff, 0xd1, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行13 */
+    0x00, 0x2c, 0xf9, 0xff, 0x9e, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行14 */
+    0x00, 0x00, 0x6b, 0xff, 0xff, 0xc7, 0x4a, 0x08, 0x00, 0x00, 0x00, 0x1b, 0x54, 0x28, 0x00, /* 行15 */
+    0x00, 0x00, 0x00, 0x60, 0xf1, 0xff, 0xff, 0xf9, 0xe3, 0xe1, 0xf6, 0xff, 0xff, 0x54, 0x00, /* 行16 */
+    0x00, 0x00, 0x00, 0x00, 0x13, 0x78, 0xc0, 0xe8, 0xfa, 0xf3, 0xe1, 0xc1, 0x82, 0x1c, 0x00, /* 行17 */
+};
+static const unsigned char open_sans_25px_char_038_bitmap[] = {
+    0x00, 0x00, 0x00, 0x27, 0xa3, 0xdb, 0xf6, 0xde, 0xa3, 0x21, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行 0 */
+    0x00, 0x00, 0x3b, 0xf8, 0xff, 0xdb, 0xb5, 0xe0, 0xff, 0xf2, 0x29, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行 1 */
+    0x00, 0x00, 0xbe, 0xff, 0x8b, 0x01, 0x00, 0x04, 0xa9, 0xff, 0xa1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行 2 */
+    0x00, 0x00, 0xec, 0xff, 0x1a, 0x00, 0x00, 0x00, 0x42, 0xff, 0xcc, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行 3 */
+    0x00, 0x00, 0xd5, 0xff, 0x2d, 0x00, 0x00, 0x00, 0x5d, 0xff, 0xb2, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行 4 */
+    0x00, 0x00, 0x86, 0xff, 0xa5, 0x00, 0x00, 0x16, 0xdb, 0xff, 0x51, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行 5 */
+    0x00, 0x00, 0x12, 0xe4, 0xff, 0x73, 0x43, 0xdf, 0xff, 0x9a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行 6 */
+    0x00, 0x00, 0x00, 0x33, 0xf3, 0xff, 0xff, 0xf6, 0x72, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行 7 */
+    0x00, 0x00, 0x07, 0x89, 0xfa, 0xff, 0xff, 0x96, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 行 8 */
+    0x00, 0x18, 0xce, 0xff, 0xd6, 0x6c, 0xf5, 0xff, 0x88, 0x00, 0x00, 0x00, 0x00, 0x26, 0xff, 0xe7, 0x00, 0x00, /* 行 9 */
+    0x01, 0xc8, 0xff, 0xac, 0x09, 0x00, 0x3f, 0xf4, 0xff, 0x8f, 0x00, 0x00, 0x00, 0x74, 0xff, 0x9e, 0x00, 0x00, /* 行10 */
+    0x4b, 0xff, 0xde, 0x06, 0x00, 0x00, 0x00, 0x3d, 0xf3, 0xff, 0x96, 0x01, 0x00, 0xcd, 0xff, 0x40, 0x00, 0x00, /* 行11 */
+    0x87, 0xff, 0x8e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3b, 0xf2, 0xff, 0x9c, 0x5e, 0xff, 0xcb, 0x00, 0x00, 0x00, /* 行12 */
+    0x98, 0xff, 0x8e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x39, 0xf1, 0xff, 0xfe, 0xfb, 0x39, 0x00, 0x00, 0x00, /* 行13 */
+    0x75, 0xff, 0xd2, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79, 0xff, 0xff, 0xc7, 0x03, 0x00, 0x00, 0x00, /* 行14 */
+    0x1f, 0xf9, 0xff, 0xa6, 0x17, 0x00, 0x00, 0x03, 0x37, 0xa3, 0xfe, 0xfe, 0xf5, 0xff, 0xa7, 0x03, 0x00, 0x00, /* 行15 */
+    0x00, 0x61, 0xfc, 0xff, 0xfd, 0xe0, 0xda, 0xf3, 0xff, 0xff, 0xdd, 0x40, 0x34, 0xee, 0xff, 0xaa, 0x04, 0x00, /* 行16 */
+    0x00, 0x00, 0x32, 0xa2, 0xe1, 0xf9, 0xf5, 0xdf, 0xa9, 0x59, 0x04, 0x00, 0x00, 0x30, 0xeb, 0xff, 0xac, 0x05, /* 行17 */
+};
+    ipgui_mask_surface_t char_mask;
+    char_mask.w = 16;
+    char_mask.h = 18;
+    char_mask.mask = (u8_t *)open_sans_25px_char_065_bitmap;
+
+    u8_t mask_blur_out[30 * 30];
+    u8_t mask_blur_out1[40 * 40];
+    u8_t mask_blur_out2[50 * 50];
+
+    ipgui_mask_surface_t char_a_mask_blur_out;
+    char_a_mask_blur_out.w = 30;
+    char_a_mask_blur_out.h = 30;
+    char_a_mask_blur_out.mask = mask_blur_out;
+
+    ipgui_mask_surface_t char_a_mask_blur_out1;
+    char_a_mask_blur_out1.w = 40;
+    char_a_mask_blur_out1.h = 40;
+    char_a_mask_blur_out1.mask = mask_blur_out1;
+
+    ipgui_mask_surface_t char_a_mask_blur_out2;
+    char_a_mask_blur_out2.w = 50;
+    char_a_mask_blur_out2.h = 50;
+    char_a_mask_blur_out2.mask = mask_blur_out2;
+
+    ipgui_average_blur_hor(&char_mask, 4, &char_a_mask_blur_out);
+    ipgui_average_blur_hor(&char_mask, 4, &char_a_mask_blur_out1);
+    ipgui_average_blur_hor(&char_mask, 4, &char_a_mask_blur_out2);
+
+    ipgui_average_blur_ver(&char_a_mask_blur_out2, 4, &char_a_mask_blur_out2);
+    ipgui_average_blur_ver(&char_a_mask_blur_out2, 4, &char_a_mask_blur_out2);
+    ipgui_average_blur_ver(&char_a_mask_blur_out2, 4, &char_a_mask_blur_out2);
+
+    ipgui_color_t color11;
+    IPGUI_COLOR_SET(color11, 255, 0xff0000);
+    ipgui_aabb_t aabb;
+    aabb.start.x = 0;
+    aabb.start.y = 0;
+    aabb.end.x = 49;
+    aabb.end.y = 49;
+    ipgui_blend_color(
+        ctx->surf,
+        NULL,
+        &aabb,
+        color11,
+        255,
+        mask_blur_out2,      /* mask覆盖mask_aabb区域 */
+        &aabb,  /* mask对应的坐标区域，必须大于或等于dest区域 */
+    0);
+    
+    char_mask.w = 13;
+    char_mask.h = 18;
+    char_mask.mask = (u8_t *)open_sans_25px_char_066_bitmap;
+
+    ipgui_average_blur_hor(&char_mask, 4, &char_a_mask_blur_out);
+    ipgui_average_blur_hor(&char_mask, 4, &char_a_mask_blur_out1);
+    ipgui_average_blur_hor(&char_mask, 4, &char_a_mask_blur_out2);
+
+    ipgui_average_blur_ver(&char_a_mask_blur_out2, 4, &char_a_mask_blur_out2);
+    ipgui_average_blur_ver(&char_a_mask_blur_out2, 4, &char_a_mask_blur_out2);
+    ipgui_average_blur_ver(&char_a_mask_blur_out2, 4, &char_a_mask_blur_out2);
+
+    aabb.start.x = 18;
+    aabb.start.y = 0;
+    aabb.end.x = 49 + 18;
+    aabb.end.y = 49;
+    ipgui_blend_color(
+        ctx->surf,
+        NULL,
+        &aabb,
+        color11,
+        255,
+        mask_blur_out2,      /* mask覆盖mask_aabb区域 */
+        &aabb,  /* mask对应的坐标区域，必须大于或等于dest区域 */
+    0);
+
+    char_mask.w = 15;
+    char_mask.h = 18;
+    char_mask.mask = (u8_t *)open_sans_25px_char_067_bitmap;
+    ipgui_average_blur_hor(&char_mask, 4, &char_a_mask_blur_out);
+    ipgui_average_blur_hor(&char_mask, 4, &char_a_mask_blur_out1);
+    ipgui_average_blur_hor(&char_mask, 4, &char_a_mask_blur_out2);
+
+    ipgui_average_blur_ver(&char_a_mask_blur_out2, 4, &char_a_mask_blur_out2);
+    ipgui_average_blur_ver(&char_a_mask_blur_out2, 4, &char_a_mask_blur_out2);
+    ipgui_average_blur_ver(&char_a_mask_blur_out2, 4, &char_a_mask_blur_out2);
+
+    aabb.start.x = 33;
+    aabb.start.y = 0;
+    aabb.end.x = 49 + 16 + 17;
+    aabb.end.y = 49;
+    ipgui_blend_color(
+        ctx->surf,
+        NULL,
+        &aabb,
+        color11,
+        255,
+        mask_blur_out2,      /* mask覆盖mask_aabb区域 */
+        &aabb,  /* mask对应的坐标区域，必须大于或等于dest区域 */
+    0);
+
+    char_mask.w = 18;
+    char_mask.h = 18;
+    char_mask.mask = (u8_t *)open_sans_25px_char_038_bitmap;
+
+    ipgui_average_blur_hor(&char_mask, 4, &char_a_mask_blur_out);
+    ipgui_average_blur_hor(&char_mask, 4, &char_a_mask_blur_out1);
+    ipgui_average_blur_hor(&char_mask, 4, &char_a_mask_blur_out2);
+
+    ipgui_average_blur_ver(&char_a_mask_blur_out2, 4, &char_a_mask_blur_out2);
+    ipgui_average_blur_ver(&char_a_mask_blur_out2, 4, &char_a_mask_blur_out2);
+    ipgui_average_blur_ver(&char_a_mask_blur_out2, 4, &char_a_mask_blur_out2);
+
+    aabb.start.x = 32 + 16;
+    aabb.start.y = 0;
+    aabb.end.x = 49 + 16 + 16 + 16;
+    aabb.end.y = 49;
+    ipgui_blend_color(
+        ctx->surf,
+        NULL,
+        &aabb,
+        color11,
+        255,
+        mask_blur_out2,      /* mask覆盖mask_aabb区域 */
+        &aabb,  /* mask对应的坐标区域，必须大于或等于dest区域 */
+    0);
+
+    ipgui_font_style_t font_style;
+    font_style.blend_mode = IPGUI_BLEND_NORMAL;
+    font_style.opacity = 200;
+    font_style.line_spacing = 0;
+    font_style.font = &open_sans_25px;
+    font_style.paint.type = IPGUI_PAINT_COLOR;
+IPGUI_COLOR_SET(font_style.paint.src.color, 255, IPGUI_COLOR_WHITE);
+    ipgui_draw_builtin_text(
+        ctx->surf,
+        (ipgui_aabb_t *)0,
+        &font_style,
+        "ABC&",
+        1,
+        30);
+}
+
+void icon_render(struct ipgui_widget * widget, ipgui_widget_render_ctx_t * ctx)
+{
+    ipgui_icon_data_t icon_play = {
+       .w = 500, .h = 500,
+       .mask = (u8_t *)icon_play_mask,
+    };
+    ipgui_point_t pivot = {0, 0};
+    ipgui_point_t anchor = {0, 0};
+    ipgui_draw_icon_style_t style;
+    style.blend_mode = IPGUI_BLEND_NORMAL;
+    style.opacity = 255;
+
+    //图片填充
+    ipgui_aabb_t img_aabb;
+    img_aabb.start.x = 0;
+    img_aabb.start.y = 0;
+    img_aabb.end.x = main_bg_img.w - 1;
+    img_aabb.end.y = main_bg_img.h - 1;
+
+    ipgui_image_src_t img_src;
+    img_src.buf       = main_bg_img.pixmap;
+    img_src.img_pxfmt = main_bg_img.fmt;
+    img_src.px_size   = main_bg_img.px_size;
+    img_src.stride    = main_bg_img.stride;
+    img_src.img_aabb  = &img_aabb;
+
+    style.paint.type = IPGUI_PAINT_IMAGE;
+    style.paint.src.image_src = img_src;
+
+    // // 渐变填充
+    // style.paint.type = IPGUI_PAINT_GRADIENT;
+    // style.paint.src.grad_src.grad_type = IPGUI_GRADIENT_TYPE_LINEAR;
+    // ipgui_liner_gradient_init_direct(&style.paint.src.grad_src.grad.liner_grad, 
+    //     0,0, 240,240);
+
+    // ipgui_gradient_color_stop_t stop0;
+    // stop0.pos = 0;
+    // IPGUI_COLOR_SET(stop0.color, 255, 0xff0000);
+    // ipgui_liner_gradient_add_stop(&style.paint.src.grad_src.grad.liner_grad, &stop0);
+
+    // ipgui_gradient_color_stop_t stop255;
+    // stop255.pos = 255;
+    // IPGUI_COLOR_SET(stop255.color, 255, 0xffff00);
+    // ipgui_liner_gradient_add_stop(&style.paint.src.grad_src.grad.liner_grad, &stop255);
+
+    ipgui_draw_icon(
+        ctx->surf,
+        NULL,
+        &icon_play,
+        &pivot,    /* 相对于图标的变换点 如果是子图标那么就是相对于子图标的 */
+        &anchor,
+        NULL,
+        &style);
+}
+
+/* ========== 页面切换示例 ==========
+ * 每个 page 是一棵独立的控件树，ipgui_screen_page_switch() 只改 act_page
+ * 并把整屏置脏，切走的那一页控件与状态都保留。
+ */
+static widget_color_t col_page2_bg = {0x2a, 0x3a, 0x5e};
+
+static void page_next_handler(ipgui_widget_t * w, ipgui_widget_evt_t * e)
+{
+    if (e->type == IPGUI_WIDGET_EVENT_RELEASED)
+        ipgui_screen_page_switch(&main_screen, 1);
+}
+
+static void page_back_handler(ipgui_widget_t * w, ipgui_widget_evt_t * e)
+{
+    if (e->type == IPGUI_WIDGET_EVENT_RELEASED)
+        ipgui_screen_page_switch(&main_screen, 0);
+}
+
+static void page_next2_handler(ipgui_widget_t * w, ipgui_widget_evt_t * e)
+{
+    if (e->type == IPGUI_WIDGET_EVENT_RELEASED)
+        ipgui_screen_page_switch(&main_screen, 2);
+}
+
+static void page2_back_handler(ipgui_widget_t * w, ipgui_widget_evt_t * e)
+{
+    if (e->type == IPGUI_WIDGET_EVENT_RELEASED)
+        ipgui_screen_page_switch(&main_screen, 1);
+}
+
+static void page_next3_handler(ipgui_widget_t * w, ipgui_widget_evt_t * e)
+{
+    if (e->type == IPGUI_WIDGET_EVENT_RELEASED)
+        ipgui_screen_page_switch(&main_screen, 3);
+}
+
+static void page3_back_handler(ipgui_widget_t * w, ipgui_widget_evt_t * e)
+{
+    if (e->type == IPGUI_WIDGET_EVENT_RELEASED)
+        ipgui_screen_page_switch(&main_screen, 2);
+}
+
+/* ========== 第 4 页：E-MOTION 电摩 HMI ========== */
+static void page_next4_handler(ipgui_widget_t * w, ipgui_widget_evt_t * e)
+{
+    if (e->type == IPGUI_WIDGET_EVENT_RELEASED)
+        ipgui_screen_page_switch(&main_screen, 4);
+}
+
+/* ========== 第 2 页：手机桌面图标排布 ==========
+ * 手机壳/屏幕/状态栏/桌面图标网格/页码点，全部用网格布局摆放。
+ */
+#define APP_ICON_COUNT 12
+
+typedef struct { u8_t r, g, b, radius; } panel_color_t;
+
+typedef struct {
+    ipgui_image_data_t * img;
+    const s8_t         * label;
+} app_icon_t;
+
+static panel_color_t panel_phone  = {0x0d, 0x0f, 0x16, 28};
+static panel_color_t panel_screen = {0x1b, 0x20, 0x2e, 20};
+
+static ipgui_image_data_t app_imgs[APP_ICON_COUNT];
+static app_icon_t         app_icons[APP_ICON_COUNT];
+
+static const s8_t * app_icon_paths[APP_ICON_COUNT] = {
+    "M:/test/ESDBox_IPGUI/widget/src/app_icons/amazon-512x512.bmp",
+    "M:/test/ESDBox_IPGUI/widget/src/app_icons/Discord Server-512x512.bmp",
+    "M:/test/ESDBox_IPGUI/widget/src/app_icons/dribbble-512x512.bmp",
+    "M:/test/ESDBox_IPGUI/widget/src/app_icons/dropbox-512x512.bmp",
+    "M:/test/ESDBox_IPGUI/widget/src/app_icons/envato marketplace-512x512.bmp",
+    "M:/test/ESDBox_IPGUI/widget/src/app_icons/evernote-512x512.bmp",
+    "M:/test/ESDBox_IPGUI/widget/src/app_icons/facebook-512x512.bmp",
+    "M:/test/ESDBox_IPGUI/widget/src/app_icons/flickr-512x512.bmp",
+    "M:/test/ESDBox_IPGUI/widget/src/app_icons/gmail-512x512.bmp",
+    "M:/test/ESDBox_IPGUI/widget/src/app_icons/google chrome-512x512.bmp",
+    "M:/test/ESDBox_IPGUI/widget/src/app_icons/hi-512x512.bmp",
+    "M:/test/ESDBox_IPGUI/widget/src/app_icons/instagram-512x512.bmp",
+};
+
+static const s8_t * app_icon_labels[APP_ICON_COUNT] = {
+    "Amazon", "Discord", "Dribbble", "Dropbox",
+    "Envato", "Evernote", "Facebook", "Flickr",
+    "Gmail", "Chrome", "Hi", "Instagram",
+};
+
+/* 大圆角纯色块：手机外壳与屏幕 */
+static void panel_render(ipgui_widget_t * w, ipgui_widget_render_ctx_t * ctx)
+{
+    panel_color_t * c = (panel_color_t *)w->priv_data;
+    ipgui_aabb_t box = {{0, 0}, {w->w - 1, w->h - 1}};
+    ipgui_box_style_t s; ipgui_memset(&s, 0, sizeof(s));
+    s.left_top_radius = s.right_top_radius =
+        s.left_bottom_radius = s.right_bottom_radius = c->radius;
+    ipgui_box_bg_style_t bg;
+    bg.paint.type = IPGUI_PAINT_COLOR;
+    /* 注意：IPGUI_COLOR_SET 的第三个参数没有加括号，必须传单个变量，
+     * 否则 rgb >> 16 会按运算符优先级先算最后一项 */
+    u32_t rgb = ((u32_t)c->r << 16) | ((u32_t)c->g << 8) | c->b;
+    IPGUI_COLOR_SET(bg.paint.src.color, 255, rgb);
+    bg.opacity = 255;
+    bg.blend_mode = IPGUI_BLEND_NORMAL;
+    ipgui_draw_box_background(ctx->surf, NULL, &box, &s, &bg);
+}
+
+/* 状态栏：左侧时间，右侧电量胶囊 */
+static void status_bar_render(ipgui_widget_t * w, ipgui_widget_render_ctx_t * ctx)
+{
+    ipgui_font_style_t fs; ipgui_memset(&fs, 0, sizeof(fs));
+    fs.font = &open_sans_11px;
+    fs.paint.type = IPGUI_PAINT_COLOR;
+    IPGUI_COLOR_SET(fs.paint.src.color, 255, 0xFFFFFF);
+    fs.opacity = 235;
+    fs.blend_mode = IPGUI_BLEND_NORMAL;
+    ipgui_draw_builtin_text(ctx->surf, NULL, &fs, "9:41", 2, 3);
+
+    ipgui_coord_t tw = ipgui_builtin_text_width(fs.font, "5G");
+    ipgui_draw_builtin_text(ctx->surf, NULL, &fs, "5G", w->w - 30 - tw, 3);
+
+    ipgui_aabb_t bat = {{w->w - 24, 6}, {w->w - 3, 14}};
+    ipgui_box_style_t s; ipgui_memset(&s, 0, sizeof(s));
+    s.left_top_radius = s.right_top_radius =
+        s.left_bottom_radius = s.right_bottom_radius = 3;
+    ipgui_box_bg_style_t bg;
+    bg.paint.type = IPGUI_PAINT_COLOR;
+    IPGUI_COLOR_SET(bg.paint.src.color, 255, 0xFFFFFF);
+    bg.opacity = 210;
+    bg.blend_mode = IPGUI_BLEND_NORMAL;
+    ipgui_draw_box_background(ctx->surf, NULL, &bat, &s, &bg);
+}
+
+/* 把方图四角切成圆角：用底色按覆盖率涂掉圆角矩形之外的像素（2x2 超采样抗锯齿） */
+static void carve_round_corners(ipgui_surf_t * surf,
+    ipgui_coord_t x, ipgui_coord_t y, ipgui_coord_t size, ipgui_coord_t r,
+    ipgui_color_t color)
+{
+    for (ipgui_coord_t j = 0; j < r; j++) {
+        for (ipgui_coord_t i = 0; i < r; i++) {
+            u8_t outside = 0;
+            for (u8_t sy = 0; sy < 2; sy++) {
+                for (u8_t sx = 0; sx < 2; sx++) {
+                    s32_t dx = 4 * (r - i) - (1 + 2 * sx);
+                    s32_t dy = 4 * (r - j) - (1 + 2 * sy);
+                    if (dx * dx + dy * dy > 16 * r * r) outside++;
+                }
+            }
+            if (0 == outside) continue;
+            u8_t op = (u8_t)(outside * 255 / 4);
+            ipgui_draw_pixel(surf, NULL, x + i,              y + j,              color, 255, op, IPGUI_BLEND_NORMAL);
+            ipgui_draw_pixel(surf, NULL, x + size - 1 - i,   y + j,              color, 255, op, IPGUI_BLEND_NORMAL);
+            ipgui_draw_pixel(surf, NULL, x + i,              y + size - 1 - j,   color, 255, op, IPGUI_BLEND_NORMAL);
+            ipgui_draw_pixel(surf, NULL, x + size - 1 - i,   y + size - 1 - j,   color, 255, op, IPGUI_BLEND_NORMAL);
+        }
+    }
+}
+
+/* 单个桌面图标：圆角底板 + 等比缩放图标 + 名称 */
+static void app_icon_render(ipgui_widget_t * w, ipgui_widget_render_ctx_t * ctx)
+{
+    app_icon_t * app = (app_icon_t *)w->priv_data;
+    ipgui_coord_t tile = 54;
+    ipgui_coord_t tx = ((w->w - 1) - tile) / 2;
+    ipgui_coord_t ty = ((w->h - 1) - (tile + 16)) / 2;
+    ipgui_aabb_t box = {{tx, ty}, {tx + tile - 1, ty + tile - 1}};
+
+    /* 图标源图自带黑底，用同色圆角底板收口，得到规整的 App 图标外形 */
+    ipgui_box_style_t s; ipgui_memset(&s, 0, sizeof(s));
+    s.left_top_radius = s.right_top_radius =
+        s.left_bottom_radius = s.right_bottom_radius = 14;
+    ipgui_box_bg_style_t bg;
+    bg.paint.type = IPGUI_PAINT_COLOR;
+    IPGUI_COLOR_SET(bg.paint.src.color, 255, 0x000000);
+    bg.opacity = 100;
+    bg.blend_mode = IPGUI_BLEND_NORMAL;
+    ipgui_draw_box_background(ctx->surf, NULL, &box, &s, &bg);
+
+    if (app->img) {
+        ipgui_image_draw_style_t st;
+        st.opacity = 255;
+        st.blend_mode = IPGUI_BLEND_NORMAL;
+        ipgui_draw_image_in_rect(ctx->surf, app->img, &box,
+            IPGUI_IMG_ALIGN_CENTER, IPGUI_IMG_FIT_STRETCH,
+            &st, IPGUI_IMAGE_QUALITY_HIGH);
+
+        /* 源图是整块方图，用屏幕底色把四角切成圆角 */
+        ipgui_color_t screen_bg;
+        u32_t sbg = ((u32_t)panel_screen.r << 16) | ((u32_t)panel_screen.g << 8) | panel_screen.b;
+        IPGUI_COLOR_SET(screen_bg, 255, sbg);
+        carve_round_corners(ctx->surf, tx, ty, tile, 12, screen_bg);
+    }
+
+    ipgui_font_style_t fs; ipgui_memset(&fs, 0, sizeof(fs));
+    fs.font = &open_sans_11px;
+    fs.paint.type = IPGUI_PAINT_COLOR;
+    IPGUI_COLOR_SET(fs.paint.src.color, 255, 0xFFFFFF);
+    fs.opacity = 235;
+    fs.blend_mode = IPGUI_BLEND_NORMAL;
+    ipgui_coord_t tw = ipgui_builtin_text_width(fs.font, app->label);
+    ipgui_draw_builtin_text(ctx->surf, NULL, &fs, app->label,
+        ((w->w - 1) - tw) / 2, ty + tile + 3);
+}
+
+/* 底部页码点 */
+static void desk_dots_render(ipgui_widget_t * w, ipgui_widget_render_ctx_t * ctx)
+{
+    ipgui_coord_t cx = (w->w - 1) / 2;
+    ipgui_coord_t cy = (w->h - 1) / 2;
+    for (u8_t i = 0; i < 3; i++) {
+        ipgui_aabb_t d = {
+            {cx + (ipgui_coord_t)(i - 1) * 12 - 2, cy - 2},
+            {cx + (ipgui_coord_t)(i - 1) * 12 + 2, cy + 2}
+        };
+        ipgui_box_style_t s; ipgui_memset(&s, 0, sizeof(s));
+        s.left_top_radius = s.right_top_radius =
+            s.left_bottom_radius = s.right_bottom_radius = 2;
+        ipgui_box_bg_style_t bg;
+        bg.paint.type = IPGUI_PAINT_COLOR;
+        IPGUI_COLOR_SET(bg.paint.src.color, 255, 0xFFFFFF);
+        bg.opacity = (i == 0) ? 235 : 90;
+        bg.blend_mode = IPGUI_BLEND_NORMAL;
+        ipgui_draw_box_background(ctx->surf, NULL, &d, &s, &bg);
+    }
+}
+
+int main(void)
+{
+    ipgui_input_dispatcher_init(&dispatcher);
+
+    pointer_src.priv_data = (void *)0;
+    pointer_src.input_src_event_read_cb = ipgui_sdl_mouse_event_poll;
+
+    ipgui_screen_init(&main_screen, &sdl_drv);
+    ipgui_sdl_screen_init(&main_screen);
+
+    pointer_id  = ipgui_dispatcher_register_input_src(&dispatcher, &pointer_src);
+    // keyboard_id = ipgui_dispatcher_register_input_src(&dispatcher, &keyboard_src);
+    main_scr_id = ipgui_dispatcher_register_screen(&dispatcher, &main_screen);
+
+    ipgui_bind_input_src_with_screen(&dispatcher, pointer_id, main_scr_id);
+    // ipgui_bind_input_src_with_screen(&dispatcher, keyboard_id, main_scr_id);
+
+    ipgui_scr_create_pfb(&main_screen, main_screen_frame_buf, sizeof(main_screen_frame_buf), PIX_FMT_RGBA8888);
+
+    if(ipgui_init() != IPGUI_ERR_OK) {
+        printf("ipgui_init_err"); return 0;
+    }
+
+    main_screen.render_bg = draw_main_screen_backgroud_color;
+    ipgui_widget_t * widget4 = ipgui_widget_create(NULL);
+    widget4->name = "主背景";
+    widget4->render = widget4_render;
+    widget4->x = 0;
+    widget4->y = 0;
+    widget4->w = 1600;
+    widget4->h = 480;
+
+        ipgui_widget_t * widget3 = ipgui_widget_create(NULL);
+    widget3->name = "波浪";
+    widget3->render = widget3_render;
+    widget3->x = 0;
+    widget3->y = 250;
+    widget3->w = 800;
+    widget3->h = 140;
+
+    ipgui_widget_t * widget_arc_bg = ipgui_widget_create(NULL);
+    widget_arc_bg->name = "圆弧背景";
+    widget_arc_bg->render = arc_bg_render;
+    widget_arc_bg->x = 0;
+    widget_arc_bg->y = 0;
+    widget_arc_bg->w = 800;
+    widget_arc_bg->h = 480;
+
+    ipgui_widget_t * widget_knob = ipgui_widget_create(NULL);
+    widget_knob->name = "旋钮圆";
+    widget_knob->render = knob_circle_render;
+    widget_knob->event_handler = knob_circle_event_handler;
+    widget_knob->x = 60;
+    widget_knob->y = 102;
+    widget_knob->w = 26;
+    widget_knob->h = 26;
+
+    ipgui_widget_t * widget_brightness_label = ipgui_widget_create(NULL);
+    widget_brightness_label->name = "亮度数值";
+    widget_brightness_label->render = brightness_label_render;
+    widget_brightness_label->x = 58;
+    widget_brightness_label->y = 265;
+    widget_brightness_label->w = 110;
+    widget_brightness_label->h = 35;
+
+
+
+    // /* create widget */
+    // ipgui_widget_t * widget1 = ipgui_widget_create(NULL);
+    // widget1->render = widget1_render;
+    // widget1->x = 0;
+    // widget1->y = 0;
+    // widget1->w = 800;
+    // widget1->h = 479;
+
+    // ipgui_widget_t * widget2 = ipgui_widget_create(widget1);
+    // widget2->render = widget2_render;
+    // widget2->x = 0;
+    // widget2->y = 0;
+    // widget2->w = 800;
+    // widget2->h = 479;
+
+
+
+    ipgui_img_dsc_t img_dsc;
+    if(0 != test_bmp("M:/test/ESDBox_IPGUI/widget/src/wave.bmp", &img_dsc))
+    {
+        printf("Failed to load bitmap image, please run the program at the main.c page\n");
+        return -1;
+    }
+
+
+    ipgui_img_dsc_t img_bg_dsc;
+    if(0 != test_bmp("M:/test/ESDBox_IPGUI/widget/src/bg.bmp", &img_bg_dsc))
+    {
+        printf("Failed to load bitmap image, please run the program at the main.c page\n");
+        return -1;
+    }
+    ipgui_img_dsc_t img_power_dsc;
+    if(0 != test_bmp("M:/test/ESDBox_IPGUI/widget/src/lightning.bmp", &img_power_dsc))
+    {
+        printf("Failed to load bitmap image, please run the program at the main.c page\n");
+        return -1;
+    }
+
+    main_bg_img.pixmap = img_bg_dsc.pixmap;
+    main_bg_img.px_size = img_bg_dsc.stride / img_bg_dsc.w;
+    main_bg_img.fmt = IPGUI_IMG_FMT_RGBA8888;
+    main_bg_img.stride = img_bg_dsc.stride;
+    main_bg_img.w = img_bg_dsc.w;
+    main_bg_img.h = img_bg_dsc.h;
+
+
+    wave_img.pixmap = img_dsc.pixmap;
+    wave_img.px_size = img_dsc.stride / img_dsc.w;
+    wave_img.fmt = IPGUI_IMG_FMT_RGBA8888;
+    wave_img.stride = img_dsc.stride;
+    wave_img.w = img_dsc.w;
+    wave_img.h = img_dsc.h;
+
+    power_img.pixmap = img_power_dsc.pixmap;
+    power_img.px_size = img_power_dsc.stride / img_power_dsc.w;
+    power_img.fmt = IPGUI_IMG_FMT_BGRA8888;
+    power_img.stride = img_power_dsc.stride;
+    power_img.w = img_power_dsc.w;
+    power_img.h = img_power_dsc.h;
+
+    ipgui_img_dsc_t img_tablelamp_dsc;
+    if(0 != test_bmp("M:/test/ESDBox_IPGUI/widget/src/tablelamp.bmp", &img_tablelamp_dsc))
+    {
+        printf("Failed to load bitmap image, please run the program at the main.c page\n");
+        return -1;
+    }
+    tablelamp_img.pixmap = img_tablelamp_dsc.pixmap;
+    tablelamp_img.px_size = img_tablelamp_dsc.stride / img_tablelamp_dsc.w;
+    tablelamp_img.fmt = IPGUI_IMG_FMT_BGRA8888;
+    tablelamp_img.stride = img_tablelamp_dsc.stride;
+    tablelamp_img.w = img_tablelamp_dsc.w;
+    tablelamp_img.h = img_tablelamp_dsc.h;
+
+    ipgui_img_dsc_t img_tablelamp_on_dsc;
+    if(0 != test_bmp("M:/test/ESDBox_IPGUI/widget/src/tablelamp_on.bmp", &img_tablelamp_on_dsc))
+    {
+        printf("Failed to load bitmap image, please run the program at the main.c page\n");
+        return -1;
+    }
+    tablelamp_on_img.pixmap = img_tablelamp_on_dsc.pixmap;
+    tablelamp_on_img.px_size = img_tablelamp_on_dsc.stride / img_tablelamp_on_dsc.w;
+    tablelamp_on_img.fmt = IPGUI_IMG_FMT_BGRA8888;
+    tablelamp_on_img.stride = img_tablelamp_on_dsc.stride;
+    tablelamp_on_img.w = img_tablelamp_on_dsc.w;
+    tablelamp_on_img.h = img_tablelamp_on_dsc.h;
+
+    ipgui_widget_t * widget_switch = ipgui_widget_create(NULL);
+    widget_switch->name = "开关";
+    widget_switch->render = widget_switch_render;
+    widget_switch->event_handler = widget_switch_event_handler;
+    widget_switch->x = 365;
+    widget_switch->y = 400;
+    widget_switch->w = 90;
+    widget_switch->h = 40;
+
+    ipgui_widget_t * widget_switch_label = ipgui_widget_create(NULL);
+    widget_switch_label->name = "开关标签";
+    widget_switch_label->render = widget_switch_label_render;
+    widget_switch_label->x = 362;
+    widget_switch_label->y = 376;
+    widget_switch_label->w = 110;
+    widget_switch_label->h = 30;
+
+    ipgui_widget_t * widget_arc_label = ipgui_widget_create(NULL);
+    widget_arc_label->name = "圆弧标签";
+    widget_arc_label->render = widget_arc_label_render;
+    widget_arc_label->x = 55;
+    widget_arc_label->y = 260;
+    widget_arc_label->w = 120;
+    widget_arc_label->h = 80;
+
+    ipgui_widget_t * widget_power = ipgui_widget_create(NULL);
+    widget_power->name = "电源图标和标签";
+    widget_power->render = power_render;
+    widget_power->x = 350;
+    widget_power->y = 50;
+    widget_power->w = 130;
+    widget_power->h = 100;
+
+    ipgui_widget_t * widget_tablelamp = ipgui_widget_create(NULL);
+    widget_tablelamp->name = "台灯图标和标签";
+    widget_tablelamp->render = tablelamp_render;
+    widget_tablelamp->event_handler = tablelamp_event_handler;
+    widget_tablelamp->x = 630;
+    widget_tablelamp->y = 50;
+    widget_tablelamp->w = 100;
+    widget_tablelamp->h = 100;
+
+    ipgui_widget_t * widget_labal_livingroom = ipgui_widget_create(NULL);
+    widget_labal_livingroom->name = "客厅标签";
+    widget_labal_livingroom->render =_label_livingroom_render;
+    widget_labal_livingroom->event_handler = livingroom_event_handler;
+    widget_labal_livingroom->x = 628;
+    widget_labal_livingroom->y = 435;
+    widget_labal_livingroom->w = 200;
+    widget_labal_livingroom->h = 60;
+
+    // //测试图标渲染
+    // ipgui_widget_t * widget_icon = ipgui_widget_create(NULL);
+    // widget_icon->name = "小红书";
+    // widget_icon->render = icon_render;
+    // widget_icon->x = 0;
+    // widget_icon->y = 0;
+    // widget_icon->w = 250;
+    // widget_icon->h = 250;
+
+    /* ========== 测试：滚动 vs 拖拽 ==========
+     * wid1: 屏幕级, SCROLLABLE, 不可拖拽
+     * wid2: wid1 的子控件, SCROLLABLE, 不可拖拽
+     * wid3: wid1 的子控件, 不可滚动, 可拖拽
+     * wid4: wid2 的子控件, 什么都不可
+     */
+    /* wid1: 根级可滚动容器 */
+    ipgui_widget_t * wid1 = ipgui_widget_create(NULL);
+    wid1->name = "wid1_scroll";
+    wid1->x = 380; wid1->y = 20;
+    wid1->w = 380; wid1->h = 420;
+    wid1->flags |= IPGUI_WIDGET_FLAG_SCROLLABLE;
+    wid1->event_handler = NULL;
+    wid1->priv_data = (void *)&col_blue;
+    wid1->render = color_render;
+
+    /* wid2: 嵌套可滚动容器（wid1 的子控件） */
+    ipgui_widget_t * wid2 = ipgui_widget_create(wid1);
+    wid2->name = "wid2_scroll";
+    wid2->x = 10; wid2->y = 100;
+    wid2->w = 200; wid2->h = 220;
+    wid2->flags |= IPGUI_WIDGET_FLAG_SCROLLABLE;
+    wid2->scroll_dir = IPGUI_SCROLL_DIR_GESTURE;
+    wid2->event_handler = NULL;
+    wid2->priv_data = (void *)&col_green;
+    wid2->render = color_render;
+
+
+    /* wid2 的子控件：模拟长列表内容，超出 wid2 可视区即可触发滚动 */
+    static widget_color_t item_colors[] = {
+        {0xe0, 0x5d, 0x5d}, {0x5d, 0xb8, 0x5d}, {0x4a, 0x90, 0xd9},
+        {0xf0, 0x8a, 0x3a}, {0x9b, 0x59, 0xb6}, {0xe9, 0x45, 0x60},
+        {0x00, 0xb4, 0xd8}, {0xf4, 0xa2, 0x61}, {0x2a, 0x9d, 0x8f},
+        {0x83, 0x38, 0xec}, {0xff, 0x00, 0x6e}, {0x3a, 0x86, 0xff},
+        {0xfb, 0x56, 0x07}, {0x06, 0xd6, 0xa0}, {0xc7, 0x7d, 0xff},
+    };
+    static char item_names[15][20];
+    for (int i = 0; i < 15; i++) {
+        ipgui_widget_t * item = ipgui_widget_create(wid2);
+        snprintf(item_names[i], sizeof(item_names[i]), "Item %d", i);
+        item->name = item_names[i];
+        item->x = 5 + i * 85;
+        item->y = 5;
+        item->w = 80;
+        item->h = 210;
+        item->priv_data = (void *)&item_colors[i % 15];
+        item->render = color_render;
+    }
+
+    /* wid3: wid1 的子控件，可拖拽 */
+    ipgui_widget_t * wid3 = ipgui_widget_create(wid1);
+    wid3->name = "wid3_drag";
+    wid3->x = 230; wid3->y = 100;
+    wid3->w = 130; wid3->h = 220;
+    wid3->priv_data = (void *)&col_orange;
+    wid3->render = color_render;
+    wid3->event_handler = drag_handler;
+    /* 不设 SCROLLABLE —— 不可滚动，但 drag_handler 直接改 x/y */
+
+    /* ========== 页面切换示例 ========== */
+    /* 第 0 页：左下角一个 NEXT 按钮 */
+    ipgui_widget_t * btn_next = ipgui_widget_create(NULL);
+    btn_next->name = "NEXT";
+    btn_next->render = color_render;
+    btn_next->event_handler = page_next_handler;
+    btn_next->x = 20;
+    btn_next->y = 425;
+    btn_next->w = 120;
+    btn_next->h = 40;
+    btn_next->priv_data = (void *)&col_purple;
+
+    /* ===== 阴影验证例子 ===== */
+    // ipgui_widget_t * shadow_demo = ipgui_widget_create(NULL);
+    // shadow_demo->name = NULL;
+    // shadow_demo->render = shadow_demo_render;
+    // shadow_demo->x = 0;
+    // shadow_demo->y = 0;
+    // shadow_demo->w = 799;
+    // shadow_demo->h = 479;
+
+    /* 切到第 1 页后再创建，ipgui_widget_create(NULL) 会挂到当前页 */
+    ipgui_screen_page_switch(&main_screen, 1);
+
+    ipgui_widget_t * page2_bg = ipgui_widget_create(NULL);
+    page2_bg->name = "PAGE 2";
+    page2_bg->render = color_render;
+    page2_bg->x = 60;
+    page2_bg->y = 60;
+    page2_bg->w = 680;
+    page2_bg->h = 300;
+    page2_bg->priv_data = (void *)&col_page2_bg;
+    /* 本页内容容器可滚动：勾上 SCROLLABLE 后，内核在 ipgui_screen_handle_widget_event
+     * 里自动调用 ipgui_widget_scroll_handler，拖动改 scroll_x/scroll_y，松手带惯性，
+     * 不需要自己写 event_handler */
+    page2_bg->flags |= IPGUI_WIDGET_FLAG_SCROLLABLE;
+    page2_bg->scroll_dir = IPGUI_SCROLL_DIR_GESTURE;
+
+    /* 网格容器：A 跨两行，B/C 第一行，D/E 自动流到第二行 */
+    ipgui_widget_t * page2_a = ipgui_widget_create(page2_bg);
+    page2_a->name = "A";
+    page2_a->render = color_render;
+    page2_a->w = 100;
+    page2_a->h = 100;
+    page2_a->priv_data = (void *)&col_red;
+
+    ipgui_widget_t * page2_b = ipgui_widget_create(page2_bg);
+    page2_b->name = "B";
+    page2_b->render = color_render;
+    page2_b->w = 100;
+    page2_b->h = 100;
+    page2_b->priv_data = (void *)&col_green;
+
+    ipgui_widget_t * page2_c = ipgui_widget_create(page2_bg);
+    page2_c->name = "C";
+    page2_c->render = color_render;
+    page2_c->w = 160;
+    page2_c->h = 100;
+    page2_c->priv_data = (void *)&col_orange;
+
+    ipgui_widget_t * page2_d = ipgui_widget_create(page2_bg);
+    page2_d->name = "D";
+    page2_d->render = color_render;
+    page2_d->w = 100;
+    page2_d->h = 100;
+    page2_d->priv_data = (void *)&col_purple;
+
+    ipgui_widget_t * page2_e = ipgui_widget_create(page2_bg);
+    page2_e->name = "E";
+    page2_e->render = color_render;
+    page2_e->w = 100;
+    page2_e->h = 100;
+    page2_e->priv_data = (void *)&col_blue;
+
+    /* 列：1fr | 120px | auto(取 C 的宽度)；行：120px | 1fr */
+    static const ipgui_grid_track_t grid_cols[] = {
+        {IPGUI_GRID_TRACK_FR,    1},
+        {IPGUI_GRID_TRACK_FIXED, 120},
+        {IPGUI_GRID_TRACK_AUTO,  0},
+    };
+    static const ipgui_grid_track_t grid_rows[] = {
+        {IPGUI_GRID_TRACK_FIXED, 120},
+        {IPGUI_GRID_TRACK_FR,    1},
+    };
+    /* 按子控件创建顺序对应：A 跨两行，其余默认 1x1 自动放置 */
+    static const ipgui_grid_item_t grid_items[] = {
+        {IPGUI_GRID_AUTO, IPGUI_GRID_AUTO, 1, 2},
+    };
+    ipgui_grid_cfg_t grid_cfg = {
+        .cols = grid_cols,
+        .col_count = 3,
+        .rows = grid_rows,
+        .row_count = 2,
+        .items = grid_items,
+        .item_count = 1,
+        .col_gap = 12,
+        .row_gap = 12,
+        .pad_left = 16,
+        .pad_top = 16,
+        .pad_right = 16,
+        .pad_bottom = 16,
+    };
+    ipgui_grid_apply(page2_bg, &grid_cfg);
+
+    ipgui_widget_t * btn_back = ipgui_widget_create(NULL);
+    btn_back->name = "BACK";
+    btn_back->render = color_render;
+    btn_back->event_handler = page_back_handler;
+    btn_back->x = 20;
+    btn_back->y = 425;
+    btn_back->w = 120;
+    btn_back->h = 40;
+    btn_back->priv_data = (void *)&col_gray;
+
+    ipgui_widget_t * btn_next2 = ipgui_widget_create(NULL);
+    btn_next2->name = "NEXT";
+    btn_next2->render = color_render;
+    btn_next2->event_handler = page_next2_handler;
+    btn_next2->x = 660;
+    btn_next2->y = 425;
+    btn_next2->w = 120;
+    btn_next2->h = 40;
+    btn_next2->priv_data = (void *)&col_purple;
+
+    /* ========== 第 2 页：手机桌面 ========== */
+    ipgui_screen_page_switch(&main_screen, 2);
+
+    ipgui_widget_t * phone_body = ipgui_widget_create(NULL);
+    phone_body->name = "手机外壳";
+    phone_body->render = panel_render;
+    phone_body->x = 250;
+    phone_body->y = 15;
+    phone_body->w = 300;
+    phone_body->h = 450;
+    phone_body->priv_data = (void *)&panel_phone;
+
+    ipgui_widget_t * phone_screen = ipgui_widget_create(NULL);
+    phone_screen->name = "手机屏幕";
+    phone_screen->render = panel_render;
+    phone_screen->x = 258;
+    phone_screen->y = 23;
+    phone_screen->w = 284;
+    phone_screen->h = 434;
+    phone_screen->priv_data = (void *)&panel_screen;
+
+    ipgui_widget_t * status_bar = ipgui_widget_create(NULL);
+    status_bar->name = "状态栏";
+    status_bar->render = status_bar_render;
+    status_bar->x = 266;
+    status_bar->y = 29;
+    status_bar->w = 268;
+    status_bar->h = 20;
+
+    /* 桌面图标网格：4 列 x 3 行，自动流放置 12 个图标 */
+    ipgui_widget_t * desk_grid = ipgui_widget_create(NULL);
+    desk_grid->name = "桌面网格";
+    desk_grid->x = 266;
+    desk_grid->y = 31;
+    desk_grid->w = 268;
+    desk_grid->h = 414;
+
+    static const ipgui_grid_track_t desk_cols[] = {
+        {IPGUI_GRID_TRACK_FR, 1}, {IPGUI_GRID_TRACK_FR, 1},
+        {IPGUI_GRID_TRACK_FR, 1}, {IPGUI_GRID_TRACK_FR, 1},
+    };
+    static const ipgui_grid_track_t desk_rows[] = {
+        {IPGUI_GRID_TRACK_FR, 1}, {IPGUI_GRID_TRACK_FR, 1},
+        {IPGUI_GRID_TRACK_FR, 1},
+    };
+    ipgui_grid_cfg_t desk_cfg = {
+        .cols = desk_cols,
+        .col_count = 4,
+        .rows = desk_rows,
+        .row_count = 3,
+        .items = (const ipgui_grid_item_t *)0,
+        .item_count = 0,
+        .col_gap = 4,
+        .row_gap = 6,
+        .pad_left = 8,
+        .pad_top = 36,
+        .pad_right = 8,
+        .pad_bottom = 22,
+    };
+
+    for (u8_t i = 0; i < APP_ICON_COUNT; i++) {
+        ipgui_img_dsc_t icon_dsc;
+        app_icons[i].img = (ipgui_image_data_t *)0;
+        app_icons[i].label = app_icon_labels[i];
+
+        if (0 == test_bmp(app_icon_paths[i], &icon_dsc)) {
+            app_imgs[i].pixmap  = icon_dsc.pixmap;
+            app_imgs[i].px_size = (u8_t)(icon_dsc.stride / icon_dsc.w);
+            app_imgs[i].fmt     = IPGUI_IMG_FMT_BGR888;  /* 24bit bmp 内存顺序 B,G,R */
+            app_imgs[i].stride  = icon_dsc.stride;
+            app_imgs[i].w       = icon_dsc.w;
+            app_imgs[i].h       = icon_dsc.h;
+            app_icons[i].img    = &app_imgs[i];
+        } else {
+            printf("load app icon failed: %s\n", (const char *)app_icon_paths[i]);
+        }
+
+        ipgui_widget_t * icon = ipgui_widget_create(desk_grid);
+        icon->name = (const char *)app_icon_labels[i];
+        icon->render = app_icon_render;
+        icon->priv_data = (void *)&app_icons[i];
+        icon->w = 60;
+        icon->h = 100;
+    }
+    ipgui_grid_apply(desk_grid, &desk_cfg);
+
+    ipgui_widget_t * desk_dots = ipgui_widget_create(NULL);
+    desk_dots->name = "页码点";
+    desk_dots->render = desk_dots_render;
+    desk_dots->x = 266;
+    desk_dots->y = 437;
+    desk_dots->w = 268;
+    desk_dots->h = 8;
+
+    ipgui_widget_t * btn_back2 = ipgui_widget_create(NULL);
+    btn_back2->name = "BACK";
+    btn_back2->render = color_render;
+    btn_back2->event_handler = page2_back_handler;
+    btn_back2->x = 20;
+    btn_back2->y = 425;
+    btn_back2->w = 120;
+    btn_back2->h = 40;
+    btn_back2->priv_data = (void *)&col_gray;
+
+    /* 第 2 页的 NEXT：进阴影用例页 */
+    ipgui_widget_t * btn_next3 = ipgui_widget_create(NULL);
+    btn_next3->name = "NEXT";
+    btn_next3->render = color_render;
+    btn_next3->event_handler = page_next3_handler;
+    btn_next3->x = 660;
+    btn_next3->y = 425;
+    btn_next3->w = 120;
+    btn_next3->h = 40;
+    btn_next3->priv_data = (void *)&col_purple;
+
+    /* ========== 第 3 页：阴影用例 ========== */
+    ipgui_screen_page_switch(&main_screen, 3);
+
+    ipgui_widget_t * shadow_bg = ipgui_widget_create(NULL);
+    shadow_bg->name = NULL;
+    shadow_bg->render = shadow_page_bg_render;
+    shadow_bg->x = 0;
+    shadow_bg->y = 0;
+    shadow_bg->w = 799;
+    shadow_bg->h = 479;
+
+    /* 阴影会画到控件本体之外，这里用一个全屏控件承载，避免被裁剪 */
+    ipgui_widget_t * shadow_cases_w = ipgui_widget_create(NULL);
+    shadow_cases_w->name = NULL;
+    shadow_cases_w->render = shadow_cases_render;
+    shadow_cases_w->x = 0;
+    shadow_cases_w->y = 0;
+    shadow_cases_w->w = 799;
+    shadow_cases_w->h = 479;
+
+    ipgui_widget_t * btn_back3 = ipgui_widget_create(NULL);
+    btn_back3->name = "BACK";
+    btn_back3->render = color_render;
+    btn_back3->event_handler = page3_back_handler;
+    btn_back3->x = 20;
+    btn_back3->y = 425;
+    btn_back3->w = 120;
+    btn_back3->h = 40;
+    btn_back3->priv_data = (void *)&col_gray;
+
+    ipgui_widget_t * btn_next4 = ipgui_widget_create(NULL);
+    btn_next4->name = "HMI";
+    btn_next4->render = color_render;
+    btn_next4->event_handler = page_next4_handler;
+    btn_next4->x = 660;
+    btn_next4->y = 425;
+    btn_next4->w = 120;
+    btn_next4->h = 40;
+    btn_next4->priv_data = (void *)&col_purple;
+
+    /* ========== 第 4 页：E-MOTION 电摩 HMI（RIDE）========== */
+    ipgui_page_emoto_init(&main_screen, 4);
+
+    /* ========== 第 5 页：E-MOTION 电摩 HMI（NAV）========== */
+    ipgui_page_emoto_nav_init(&main_screen, 5);
+
+    /* 启动页：直接进入 E-MOTION RIDE
+     * 如果想回到原来的演示首页，把下面这行改成 page 0 即可 */
+    ipgui_screen_page_switch(&main_screen, 4);
+
+    /* ========== 曲线控件 ========== */
+    // ipgui_widget_t * widget_curve = ipgui_widget_create(NULL);
+    // widget_curve->name   = "实时曲线";
+    // widget_curve->render = curve_render;
+    // widget_curve->x      = 0;
+    // widget_curve->y      = 0;
+    // widget_curve->w      = 800;
+    // widget_curve->h      = 480;
+
+
+    ipgui_input_src_evt_t raw_evt;
+    u32_t last_tick_ms = SDL_GetTicks();
+
+    while(1)
+    {
+        /* 读取所有待处理指针事件，不再把“空事件”塞进队列 */
+        while (pointer_src.input_src_event_read_cb(&pointer_src, &raw_evt)
+               == IPGUI_ERR_READ_INPUT_SRC_EVT_OK) {
+            ipgui_norm_queue_post(&dispatcher.evt_queue, &raw_evt, sizeof(raw_evt));
+        }
+
+        /* 悬停状态每帧复位，dispatch 会在当帧重新设置
+         * 只推进当前页的控件，避免非活动页往 HMI 的帧里提交脏矩形 */
+        if (main_screen.act_page == 0) {
+            widget_livingroom_update(widget_labal_livingroom);
+            widget_tablelamp_update(widget_tablelamp);
+        }
+        
+        ipgui_dispatch_input_event(&dispatcher);
+        /* 驱动所有动画，需在渲染之前调用 */
+        ipgui_anim_update_all();
+
+        /* E-MOTION 两页共用车辆状态：RIDE 页始终推进模拟，
+         * 内部只在 RIDE 可见时提交脏矩形；NAV 页自行按可见性刷新 */
+        ipgui_page_emoto_tick();
+        ipgui_page_emoto_nav_tick();
+
+        ipgui_screen_render(&main_screen);
+
+        /* 每个控件自己的 per-frame update（仅第 0 页） */
+        if (main_screen.act_page == 0) {
+            widget_switch_label_update(widget_switch_label);
+            widget_switch_update(widget_switch);
+            widget_knob_update(widget_brightness_label);
+            widget_wave_update(widget3);
+            // widget_curve_update(widget_curve);
+        }
+
+        /* 心跳：按真实毫秒推进，保证 HMI 动画速度与墙钟一致 */
+        {
+            u32_t now_ms = SDL_GetTicks();
+            u32_t delta = now_ms - last_tick_ms;
+            last_tick_ms = now_ms;
+            if (delta > 50) delta = 50;
+            while (delta --) ipgui_tick_inc();
+        }
+        Sleep(1);
+    }
+
+
+	return 0;
+}

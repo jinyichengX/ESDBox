@@ -167,5 +167,5 @@
         "ipgui_input_dispatcher.h": "c"
     },
     "C_Cpp.default.compilerPath": "E:/mingw64/bin/gcc.exe",
-    "cmake.sourceDirectory": "M:/test/RoboKit"
+    "cmake.sourceDirectory": "M:/ESDBox/RoboKit"
 }

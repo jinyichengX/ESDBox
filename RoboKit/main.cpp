@@ -251,7 +251,7 @@ int main()
                 planner.node_array_.size(), planner.GetPath().size());
     g_planner = &planner;
 
-    /* 2. IPGUI 屏幕初始化（SDL 驱动，参考 m:\test\main.c） */
+    /* 2. IPGUI 屏幕初始化（SDL 驱动，参考 m:\ESDBox\main.c） */
     ipgui_memset(&main_screen, 0, sizeof(main_screen));
     ipgui_memset(&sdl_drv, 0, sizeof(sdl_drv));
     ipgui_memset(&g_sdl_private, 0, sizeof(g_sdl_private));

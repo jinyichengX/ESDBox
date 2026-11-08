@@ -2,7 +2,7 @@
 
 Date : 2026-07-08 15:54:49
 
-Directory m:\\test\\ESDbox_IPGUI\\core
+Directory m:\\ESDBox\\ESDbox_IPGUI\\core
 
 Total : 122 files,  14961 codes, 3552 comments, 2718 blanks, all 21231 lines
 

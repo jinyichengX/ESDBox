@@ -17,7 +17,7 @@ set(IPGUI_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../ESDBox_IPGUI")
 
 # ============================================================
 # elNET（C 网络协议栈）-> C 静态库
-# 源码/头文件/依赖库集合与 m:\test\Makefile 保持一致
+# 源码/头文件/依赖库集合与 m:\ESDBox\Makefile 保持一致
 # ============================================================
 file(GLOB ELNET_C_SOURCES
     "${ELNET_ROOT}/src/*.c"
@@ -191,7 +191,7 @@ add_custom_command(TARGET app POST_BUILD
     COMMENT "Copy SDL2.dll"
 )
 
-# elNET 依赖 Windows pcap（与 m:\test\Makefile 的 link_library 一致）
+# elNET 依赖 Windows pcap（与 m:\ESDBox\Makefile 的 link_library 一致）
 target_link_libraries(app PRIVATE "${ELNET_ROOT}/port/Lib/x64/wpcap.lib")
 target_link_libraries(app PRIVATE "${ELNET_ROOT}/port/Lib/x64/Packet.lib")
 target_link_libraries(app PRIVATE m)
