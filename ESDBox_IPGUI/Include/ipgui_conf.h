@@ -55,6 +55,13 @@
 #error "INPUT_SRC_MAX must be greater than 0"
 #endif
 
+/* 1:开启FPS计算 0:关闭FPS计算 */
+#define IPGUI_FPS_MONITOR_ON 1
+#if IPGUI_FPS_MONITOR_ON
+/* 1:显示内置的FPS控件 0:不显示内置的FPS控件，可以自己写FPS控件来显示screen.fps */
+#define IPGUI_BUILTIN_FPS_WID_SHOW 1
+#endif
+
 #define SCREEN_MAX 2
 #if SCREEN_MAX < 1
 #error "SCREEN_MAX must be greater than 0"

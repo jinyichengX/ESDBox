@@ -53,7 +53,7 @@ typedef struct ipgui_scr_ctx{
     struct widget_tree_t   pages[SCREEN_PAGE_MAX];
 
     /* 当前页索引，恒小于 SCREEN_PAGE_MAX */
-    u8_t                  act_page;
+    u8_t                   act_page;
 
     /* Dirty rect manager */
     ipgui_dirty_rect_mgr_t dirty;
@@ -71,6 +71,11 @@ typedef struct ipgui_scr_ctx{
     ipgui_color_t          bg_color;
 
     void (* render_bg)(ipgui_scr_t * scr, ipgui_surf_t * surf);
+
+#if IPGUI_FPS_MONITOR_ON == 1
+    /* 屏幕的实时fps */
+    u16_t                  fps;
+#endif
 }ipgui_scr_t;
 
 extern __IPGUI_API__ ipgui_err_t ipgui_screen_init(
@@ -117,7 +122,7 @@ extern __IPGUI_API__ void        ipgui_screen_handle_widget_event(
                                         ipgui_scr_t        * scr, 
                                         ipgui_widget_evt_t * evt);
 
-extern __IPGUI_API__ void        ipgui_screen_render(ipgui_scr_t * scr);
+extern __IPGUI_API__ void        ipgui_screen_fps(ipgui_scr_t * scr);
 
 #ifdef __cplusplus
 }

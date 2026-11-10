@@ -514,3 +514,11 @@ __IPGUI_API__ void ipgui_screen_fill_region(ipgui_scr_t * scr,
         scr->drv->fill_region(scr, x1, y1, x2, y2, pix_buf, stride);
     }
 }
+
+#if IPGUI_FPS_MONITOR_ON == 1
+/* 计算FPS */
+__IPGUI_API__ void ipgui_screen_fps(ipgui_scr_t * scr)
+{
+  ;
+}
+#endif
