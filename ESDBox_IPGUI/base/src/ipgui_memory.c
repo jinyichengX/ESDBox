@@ -33,7 +33,7 @@ ipgui_mem_t * ipgui_smem = (ipgui_mem_t *)0;
 #define IPGUI_MEM_REPLACE_NODE(pold, pnew) 			        (list_replace((pold), (pnew)))
 
 /* if free list has only one node */
-#define IPGUI_MEM_FREENODE_SINGLE(pstHead) 			        ((!list_empty((pstHead)))&&((pstHead)->next=(pstHead)->prev))
+#define IPGUI_MEM_FREENODE_SINGLE(pstHead) 			        ((!list_empty((pstHead)))&&((pstHead)->next==(pstHead)->prev))
 
 /* traversal free list */
 #define IPGUI_MEM_TRAVERSAL_FREELIST				        list_for_each_safe
