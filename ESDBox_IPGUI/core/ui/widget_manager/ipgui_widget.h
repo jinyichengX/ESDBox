@@ -118,7 +118,34 @@ typedef struct ipgui_widget
     ipgui_widget_listener_slot_t listener[IPGUI_WIDGET_LISTENER_MAX];
     u8_t                         listener_num;
 #endif
+
+    /* 内容固有尺寸回调
+     * 布局向控件询问"内容需要多大"，与当前 w/h 无关，可为 NULL。
+     * NULL 时布局退回读取当前 w/h，此时内容自适应尺寸会随上一次排布结果漂移。
+     */
+    void (*measure)(struct ipgui_widget * widget,
+                    ipgui_coord_t        * out_w,
+                    ipgui_coord_t        * out_h);
+
+    /* 容器排版回调，NULL 表示该控件不是布局容器
+     * 只改后代几何，不增删控件；由 ipgui_layout_update 在 layout_dirty 置位时调用
+     */
+    void (*layout)(struct ipgui_widget * container, void * ctx);
+    void * layout_ctx;
+
+    /* 1 = 该控件作为容器需要重排，由 ipgui_layout_update 消费 */
+    u8_t   layout_dirty;
 } ipgui_widget_t;
+
+/* 公共回调类型，签名与结构体字段一致 */
+typedef void (*ipgui_widget_measure_fn)(
+    ipgui_widget_t * widget,
+    ipgui_coord_t  * out_w,
+    ipgui_coord_t  * out_h);
+
+typedef void (*ipgui_widget_layout_fn)(
+    ipgui_widget_t * container,
+    void           * ctx);
 
 /* 创建控件并挂载到 parent（parent 为 NULL 则创建游离控件，后续需手动挂载） */
 extern __IPGUI_API__ ipgui_widget_t * ipgui_widget_create(ipgui_widget_t * parent);
@@ -132,6 +159,28 @@ extern __IPGUI_API__ void ipgui_widget_set_render(
 extern __IPGUI_API__ void ipgui_widget_set_event_handler(
     ipgui_widget_t * widget,
     void (*handler)(struct ipgui_widget * widget, ipgui_widget_evt_t * evt));
+
+/* 设置内容固有尺寸回调，传 NULL 取消 */
+extern __IPGUI_API__ void ipgui_widget_set_measure(
+    ipgui_widget_t *          widget,
+    ipgui_widget_measure_fn   measure);
+
+/* 注册容器排版回调，ctx 原样回传给 layout；传 NULL 取消，表示该控件不再作为布局容器 */
+extern __IPGUI_API__ void ipgui_widget_set_layout(
+    ipgui_widget_t *        widget,
+    ipgui_widget_layout_fn  layout,
+    void *                  ctx);
+
+/* 标记该控件及其祖先容器都需要重排
+ * 控件尺寸被外部改写后调用；同一帧内多次调用只重排一次
+ */
+extern __IPGUI_API__ void ipgui_widget_mark_layout_dirty(ipgui_widget_t * widget);
+
+/* 取控件的内容固有尺寸：有 measure 回调则问它，否则退回当前 w/h */
+extern __IPGUI_API__ void ipgui_widget_content_size(
+    ipgui_widget_t *  widget,
+    ipgui_coord_t   * out_w,
+    ipgui_coord_t   * out_h);
 
 /* 获取控件在屏幕中的绝对坐标（不考虑父控件裁剪） */
 extern __IPGUI_API__ void ipgui_widget_abs_pos(ipgui_widget_t * widget, ipgui_aabb_t * r);

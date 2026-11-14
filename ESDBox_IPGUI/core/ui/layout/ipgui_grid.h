@@ -19,14 +19,18 @@ extern "C" {
  *   - 未定义的轨道自动按 auto 隐式补齐
  *   - 子控件按控件树顺序（first_child → sib_next）参与排布
  *
- * 尺寸来源：框架没有独立的 measure 阶段，auto 轨道直接以子控件当前的
- * w/h 作为内容尺寸；排布完成后子控件会被拉伸填满所占单元格（含跨格）。
+ * 尺寸来源有两种：
+ *   - 子控件注册了 measure 回调：auto 轨道取它的内容固有尺寸，重排结果稳定；
+ *   - 未注册：退回子控件当前的 w/h，此时 auto 轨道会随上一次排布结果漂移，
+ *     容器被反复重排时可能越撑越大，长文本/自适应内容请务必注册 measure。
  *
- * 嵌套：网格容器本身可以是另一个网格/布局容器的子控件，互不影响。
+ * 两种用法：
+ *   1) ipgui_grid_apply(container, &cfg)     一次性排布，cfg 可以放在栈上
+ *   2) ipgui_grid_attach(container, &cfg)    把网格注册为容器的排版方式，
+ *      之后容器尺寸变化只需 ipgui_widget_mark_layout_dirty(container)，
+ *      框架会在下一次渲染前自动重排。此时 cfg 及其指向的轨道/跨格数组必须常驻。
  *
- * 使用方式：
- *   ipgui_grid_apply(container, &cfg);
- * 每次容器尺寸或子控件集合变化后重新调用即可。
+ * 嵌套：网格容器可以是另一个网格/布局容器的子控件，互不影响。
  */
 
 /* 轨道数量上限，可在工程级重定义 */
@@ -101,6 +105,24 @@ typedef struct {
 extern __IPGUI_API__ ipgui_err_t ipgui_grid_apply(
     ipgui_widget_t *        container,
     const ipgui_grid_cfg_t * cfg);
+
+/*
+ * 把网格注册为该容器的排版方式并立即排一次
+ *
+ * 注册后只需在容器尺寸变化时调用 ipgui_widget_mark_layout_dirty(container)，
+ * 框架会在下一次 ipgui_screen_render 前自动重排，无需手动再调 apply。
+ *
+ * 注意：cfg 及其 cols/rows/items 指向的数组必须常驻（静态或全局），
+ *      布局回调执行时会再次读它们。
+ *
+ * 返回 IPGUI_ERR_OK；参数非法返回 IPGUI_ERR_PARAM。
+ */
+extern __IPGUI_API__ ipgui_err_t ipgui_grid_attach(
+    ipgui_widget_t *  container,
+    ipgui_grid_cfg_t * cfg);
+
+/* 取消该容器的网格排版方式，容器恢复为不自动重排 */
+extern __IPGUI_API__ void ipgui_grid_detach(ipgui_widget_t * container);
 
 #ifdef __cplusplus
 }

@@ -58,6 +58,9 @@ typedef struct ipgui_scr_ctx{
     /* Dirty rect manager */
     ipgui_dirty_rect_mgr_t dirty;
 
+    /* 1 = 有容器等待重排，ipgui_screen_render 入口会先消费掉 */
+    u8_t                   layout_pending;
+
     /* offline partial framebuffer */
     /* 其中的pix_fmt可以随便定义，
      * 但是在flush到屏幕时需要正确解析，
@@ -123,6 +126,14 @@ extern __IPGUI_API__ void        ipgui_screen_handle_widget_event(
                                         ipgui_widget_evt_t * evt);
 
 extern __IPGUI_API__ void        ipgui_screen_fps(ipgui_scr_t * scr);
+
+/* 重排当前页所有 layout_dirty 的容器
+ *
+ * 递归顺序是"先父后子"，祖先排完再排后代，因此一次遍历即可收敛到最终几何。
+ * 布局回调里只允许改后代几何，不允许增删控件。
+ * ipgui_screen_render 会在入口自动调用，一般无需手动调用。
+ */
+extern __IPGUI_API__ void        ipgui_layout_update(ipgui_scr_t * scr);
 
 #ifdef __cplusplus
 }

@@ -44,11 +44,91 @@ __IPGUI_API__ ipgui_widget_t * ipgui_widget_create(ipgui_widget_t * parent)
     widget->event_handler = 0;
     widget->render        = 0;
 
+    /* init layout state */
+    widget->measure      = 0;
+    widget->layout       = 0;
+    widget->layout_ctx   = 0;
+    widget->layout_dirty = 0;
+
 #if IPGUI_WIDGET_LISTENER_MAX > 0
     widget->listener_num  = 0;
 #endif
 
     return widget;
+}
+
+/* 设置内容固有尺寸回调 */
+__IPGUI_API__ void ipgui_widget_set_measure(
+    ipgui_widget_t *        widget,
+    ipgui_widget_measure_fn measure)
+{
+    if (widget)
+        widget->measure = measure;
+}
+
+/* 注册容器排版回调与上下文 */
+__IPGUI_API__ void ipgui_widget_set_layout(
+    ipgui_widget_t *        widget,
+    ipgui_widget_layout_fn  layout,
+    void *                  ctx)
+{
+    if (!widget) return;
+
+    widget->layout     = layout;
+    widget->layout_ctx = layout ? ctx : (void *)0;
+    widget->layout_dirty = 0;
+}
+
+/* 取内容固有尺寸 */
+__IPGUI_API__ void ipgui_widget_content_size(
+    ipgui_widget_t *  widget,
+    ipgui_coord_t   * out_w,
+    ipgui_coord_t   * out_h)
+{
+    ipgui_coord_t w = 0;
+    ipgui_coord_t h = 0;
+
+    if (widget) {
+        if (widget->measure) {
+            widget->measure(widget, &w, &h);
+        } else {
+            w = widget->w;
+            h = widget->h;
+        }
+        if (w < 0) w = 0;
+        if (h < 0) h = 0;
+    }
+
+    if (out_w) * out_w = w;
+    if (out_h) * out_h = h;
+}
+
+/* 自下而上标记重排：尺寸变了，自己与祖先容器都要重算 */
+__IPGUI_API__ void ipgui_widget_mark_layout_dirty(ipgui_widget_t * widget)
+{
+    struct widget_link_t * link;
+
+    if (!widget) return;
+
+    /* if it is detached from tree, return */
+    if (IPGUI_YES == ipgui_widget_link_is_detached(&widget->link))
+        return;
+
+    /* 根节点嵌入在 widget_tree_t 中，不是控件，走到根之前必须停 */
+    link = &widget->link;
+    for (;;) {
+        ipgui_widget_t * cur = ipgui_container_of(link, ipgui_widget_t, link);
+        cur->layout_dirty = 1;
+
+        if (!link->parent || IPGUI_YES == ipgui_widget_link_is_root(link->parent))
+            break;
+        link = link->parent;
+    }
+
+    {
+        ipgui_scr_t * scr = ipgui_widget_get_screen(widget);
+        if (scr) scr->layout_pending = 1;
+    }
 }
 
 /* 设置渲染回调 */

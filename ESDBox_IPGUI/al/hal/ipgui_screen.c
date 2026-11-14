@@ -288,17 +288,57 @@ __IPGUI_STATIC__ void ipgui_screen_render_dirty_rect(
     }
 }
 
+/* 主循环顺序：先重排（可能产生新的脏区域），再渲染 */
+__IPGUI_STATIC__ void ipgui_layout_update_recurse(struct widget_link_t * link)
+{
+    struct widget_link_t * child;
+
+    if (!link) return;
+    child = link->first_child;
+    if (!child) return;
+
+    for (;;) {
+        ipgui_widget_t * widget = ipgui_container_of(child, ipgui_widget_t, link);
+
+        if (widget->layout && widget->layout_dirty) {
+            /* 先清标志再回调：回调内部再次标记时不会自旋 */
+            widget->layout_dirty = 0;
+            widget->layout(widget, widget->layout_ctx);
+        }
+
+        /* 父级排完再排子级，子级拿到的就是最终可用区域 */
+        if (child->first_child)
+            ipgui_layout_update_recurse(child);
+
+        if (child->sib_next == link->first_child) break;
+        child = child->sib_next;
+    }
+}
+
+__IPGUI_API__ void ipgui_layout_update(ipgui_scr_t * scr)
+{
+    if (!scr) return;
+    if (!scr->layout_pending) return;
+
+    scr->layout_pending = 0;
+    ipgui_layout_update_recurse(&scr->pages[scr->act_page].root);
+}
+
 /* 
  * ipgui_screen_render
  * 屏幕渲染主入口——在每次帧刷新时调用。
  * 流程：
- *   1. 检查是否有脏区域，无则直接返回（零开销快速路径）
- *   2. 调用 ipgui_dirty_rect_flush() 做全局最优合并（减少渲染次数）
- *   3. 遍历合并后的脏矩形池，逐个调用 ipgui_screen_render_dirty_rect()
- *   4. 渲染完成后重置脏矩形管理器
+ *   1. 消费待重排容器（重排会改写几何并产生新的脏区域）
+ *   2. 检查是否有脏区域，无则直接返回（零开销快速路径）
+ *   3. 调用 ipgui_dirty_rect_flush() 做全局最优合并（减少渲染次数）
+ *   4. 遍历合并后的脏矩形池，逐个调用 ipgui_screen_render_dirty_rect()
+ *   5. 渲染完成后重置脏矩形管理器
  */
 __IPGUI_API__ void ipgui_screen_render(ipgui_scr_t * scr)
 {
+    /* 必须早于脏矩形检查：重排本身会往脏矩形池里加区域 */
+    ipgui_layout_update(scr);
+
     /* check if the screen have dirty region */
     if (scr->dirty.pool_num == 0) return;
 
