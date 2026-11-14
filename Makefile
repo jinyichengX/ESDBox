@@ -86,6 +86,7 @@ include_dir := $(makefile_dir)/elNET/inc\
 #$(makefile_dir)/ESDBox_IPGUI/font/opensans
 csrc_dir += $(makefile_dir)/ESDBox_IPGUI/base/src\
 			$(makefile_dir)/ESDBox_IPGUI/base/src/cache\
+			$(makefile_dir)/ESDBox_IPGUI/builtin_widget/src\
 			$(makefile_dir)/ESDBox_IPGUI/widget/src\
 			$(makefile_dir)/ESDBox_IPGUI/al/vfs\
 			$(makefile_dir)/ESDBox_IPGUI/al/hal\
@@ -116,6 +117,7 @@ csrc_dir += $(makefile_dir)/ESDBox_IPGUI/base/src\
 include_dir += $(makefile_dir)/ESDBox_IPGUI/base/inc\
 			$(makefile_dir)/ESDBox_IPGUI/base/src\
 			$(makefile_dir)/ESDBox_IPGUI/base/inc/cache\
+			$(makefile_dir)/ESDBox_IPGUI/builtin_widget/inc\
 			$(makefile_dir)/ESDBox_IPGUI/widget/inc\
 			$(makefile_dir)/ESDBox_IPGUI/Include\
 			$(makefile_dir)/ESDBox_IPGUI/al/vfs\
