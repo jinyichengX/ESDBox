@@ -20,14 +20,16 @@ u8_t * ipgui_mask_buf_acquire(
         if (p) {
             break;
         }
-#if 1
+#if 0
         h --;
 #else 
-        h = h >> 1; /* 每次失败尝试减半，提高效率 */
+        h = h / 2; /* 每次失败尝试减半，提高效率 */
 #endif
     }
 
-    * res_h = h;
+    if (res_h)
+        * res_h = h;
+        
     return p;
 }
 
