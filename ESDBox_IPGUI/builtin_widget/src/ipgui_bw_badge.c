@@ -11,8 +11,6 @@ typedef struct {
     u8_t      dot;
 } ipgui_bw_badge_t;
 
-/* -------------------------------------------------------------------------- */
-
 static void bw_bd_copy(char * dst, const char * src)
 {
     u32_t i = 0;
@@ -106,8 +104,6 @@ static void bw_bd_render(
             bd->text, 0, text_color, 255);
     }
 }
-
-/* -------------------------------------------------------------------------- */
 
 ipgui_widget_t * ipgui_bw_badge_create(
     ipgui_widget_t * parent,

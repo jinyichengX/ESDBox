@@ -490,6 +490,10 @@ __IPGUI_API__ void ipgui_screen_handle_widget_event(ipgui_scr_t * scr, ipgui_wid
     if (evt->target && evt->target->event_handler) {
         evt->target->event_handler(evt->target, evt);//event_handler的第一个参数也是多余的可以删掉
     }
+
+    /* 控件内部逻辑执行完，再通知业务监听 */
+    if (evt->target)
+        ipgui_widget_dispatch_listeners(evt->target, evt);
 }
 
 __IPGUI_API__ void ipgui_screen_putpixel(ipgui_scr_t * scr, ipgui_coord_t x, ipgui_coord_t y, u8_t * pix)

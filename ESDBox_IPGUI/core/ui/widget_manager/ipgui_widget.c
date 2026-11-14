@@ -44,6 +44,10 @@ __IPGUI_API__ ipgui_widget_t * ipgui_widget_create(ipgui_widget_t * parent)
     widget->event_handler = 0;
     widget->render        = 0;
 
+#if IPGUI_WIDGET_LISTENER_MAX > 0
+    widget->listener_num  = 0;
+#endif
+
     return widget;
 }
 

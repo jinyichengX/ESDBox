@@ -24,8 +24,6 @@ typedef struct {
     ipgui_bw_segmented_cb_t on_change;
 } ipgui_bw_segmented_t;
 
-/* -------------------------------------------------------------------------- */
-
 static void bw_sg_geom(
     ipgui_widget_t * widget, ipgui_bw_segmented_t * sg,
     ipgui_aabb_t * track, ipgui_aabb_t * inner, ipgui_coord_t * seg_w)
@@ -150,8 +148,6 @@ static void bw_sg_render(
     }
 }
 
-/* -------------------------------------------------------------------------- */
-
 static u8_t bw_sg_index_at(
     ipgui_widget_t * widget, ipgui_bw_segmented_t * sg, ipgui_coord_t x)
 {
@@ -224,8 +220,6 @@ static void bw_sg_event(
         break;
     }
 }
-
-/* -------------------------------------------------------------------------- */
 
 ipgui_widget_t * ipgui_bw_segmented_create(
     ipgui_widget_t * parent,

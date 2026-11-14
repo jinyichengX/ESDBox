@@ -23,8 +23,6 @@ typedef struct {
     ipgui_color_t   accent_to;
 } ipgui_bw_ring_progress_t;
 
-/* -------------------------------------------------------------------------- */
-
 static void bw_rp_copy_label(char * dst, const char * src)
 {
     u32_t i = 0;
@@ -181,8 +179,6 @@ static void bw_rp_render(
         }
     }
 }
-
-/* -------------------------------------------------------------------------- */
 
 ipgui_widget_t * ipgui_bw_ring_progress_create(
     ipgui_widget_t * parent,

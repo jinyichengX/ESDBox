@@ -7,6 +7,7 @@ extern "C" {
 
 #include "ipgui_utils.h"
 #include "ipgui_types.h"
+#include "ipgui_conf.h"
 #include "ipgui_prim.h"
 #include "ipgui_widget_evt.h"
 #include "ipgui_widget_tree.h"
@@ -71,6 +72,17 @@ typedef enum {
     IPGUI_SCROLL_DIR_GESTURE,     /* 沿手势滚动 */
 } ipgui_scroll_dir_t;
 
+/* 业务监听槽数量见 ipgui_conf.h 的 IPGUI_WIDGET_LISTENER_MAX */
+typedef void (*ipgui_widget_listener_fn)(
+    ipgui_widget_t * widget,
+    ipgui_widget_evt_t * evt,
+    void * user);
+
+typedef struct {
+    ipgui_widget_listener_fn fn;
+    void * user;
+} ipgui_widget_listener_slot_t;
+
 typedef struct ipgui_widget
 {
     /* 扩展数据 */
@@ -98,13 +110,15 @@ typedef struct ipgui_widget
     /* 绘制回调 */
     void (*render)       (struct ipgui_widget * widget, ipgui_widget_render_ctx_t * ctx);
 
-    /* 事件处理回调 */
+    /* 事件处理回调，控件作者使用 */
     void (*event_handler)(struct ipgui_widget * widget, ipgui_widget_evt_t * evt);
-} ipgui_widget_t;
 
-/* ==========================================================================
- * API
- * ========================================================================== */
+#if IPGUI_WIDGET_LISTENER_MAX > 0
+    /* 业务监听，控件使用者使用 */
+    ipgui_widget_listener_slot_t listener[IPGUI_WIDGET_LISTENER_MAX];
+    u8_t                         listener_num;
+#endif
+} ipgui_widget_t;
 
 /* 创建控件并挂载到 parent（parent 为 NULL 则创建游离控件，后续需手动挂载） */
 extern __IPGUI_API__ ipgui_widget_t * ipgui_widget_create(ipgui_widget_t * parent);
@@ -143,6 +157,24 @@ extern __IPGUI_API__ ipgui_scr_t * ipgui_widget_get_screen(ipgui_widget_t * widg
 /* 将父控件局部坐标转为全局坐标系的 aabb */
 extern __IPGUI_API__ void ipgui_widget_local_to_global(
     ipgui_widget_t * widget, ipgui_aabb_t * out);
+
+/* 注册一个监听；同一 (fn, user) 重复注册是幂等的 */
+extern __IPGUI_API__ ipgui_err_t ipgui_widget_listen(
+    ipgui_widget_t * widget, ipgui_widget_listener_fn fn, void * user);
+
+/* 注销一个监听 */
+extern __IPGUI_API__ ipgui_err_t ipgui_widget_unlisten(
+    ipgui_widget_t * widget, ipgui_widget_listener_fn fn, void * user);
+
+/* 清空该控件的全部监听 */
+extern __IPGUI_API__ void ipgui_widget_clear_listeners(ipgui_widget_t * widget);
+
+/* 当前监听数量 */
+extern __IPGUI_API__ int ipgui_widget_listener_count(ipgui_widget_t * widget);
+
+/* 通知监听者，框架内部调用 */
+extern __IPGUI_API__ void ipgui_widget_dispatch_listeners(
+    ipgui_widget_t * widget, ipgui_widget_evt_t * evt);
 
 #ifdef __cplusplus
 }

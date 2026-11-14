@@ -11,8 +11,6 @@ typedef struct {
     ipgui_color_t accent_right;
 } ipgui_bw_progress_t;
 
-/* -------------------------------------------------------------------------- */
-
 static void bw_pg_render(
     ipgui_widget_t * widget, ipgui_widget_render_ctx_t * ctx)
 {
@@ -87,8 +85,6 @@ static void bw_pg_render(
         ipgui_bw_text_center(s, &track, font, buf, color, 255);
     }
 }
-
-/* -------------------------------------------------------------------------- */
 
 ipgui_widget_t * ipgui_bw_progress_create(
     ipgui_widget_t * parent,

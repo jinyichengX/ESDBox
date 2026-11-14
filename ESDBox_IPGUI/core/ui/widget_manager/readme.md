@@ -1,2 +1,4 @@
 函数ipgui_widget_link_is_parent_of可能有问题
 函数ipgui_widget_link_is_detached未测试
+
+ipgui_widget_t中的`event_handler` 是控件作者用的，`listener` 是控件使用者用的。

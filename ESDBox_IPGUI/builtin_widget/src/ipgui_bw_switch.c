@@ -25,8 +25,6 @@ typedef struct {
     ipgui_bw_switch_cb_t on_change;
 } ipgui_bw_switch_t;
 
-/* -------------------------------------------------------------------------- */
-
 static void bw_sw_render(
     ipgui_widget_t * widget, ipgui_widget_render_ctx_t * ctx)
 {
@@ -119,8 +117,6 @@ static void bw_sw_render(
     }
 }
 
-/* -------------------------------------------------------------------------- */
-
 static int bw_sw_hit(ipgui_widget_t * widget, ipgui_coord_t x, ipgui_coord_t y)
 {
     return (x >= 0 && y >= 0 && x < widget->w && y < widget->h);
@@ -181,8 +177,6 @@ static void bw_sw_event(
         break;
     }
 }
-
-/* -------------------------------------------------------------------------- */
 
 ipgui_widget_t * ipgui_bw_switch_create(
     ipgui_widget_t * parent,

@@ -27,8 +27,6 @@ typedef struct {
     ipgui_bw_slider_cb_t on_change;
 } ipgui_bw_slider_t;
 
-/* -------------------------------------------------------------------------- */
-
 static void bw_sl_track_range(
     ipgui_widget_t * widget, ipgui_coord_t knob_r,
     ipgui_coord_t * x0, ipgui_coord_t * x1)
@@ -143,8 +141,6 @@ static void bw_sl_render(
     }
 }
 
-/* -------------------------------------------------------------------------- */
-
 static u8_t bw_sl_value_at(ipgui_widget_t * widget, ipgui_coord_t x)
 {
     ipgui_coord_t x0, x1;
@@ -224,8 +220,6 @@ static void bw_sl_event(
         break;
     }
 }
-
-/* -------------------------------------------------------------------------- */
 
 ipgui_widget_t * ipgui_bw_slider_create(
     ipgui_widget_t * parent,

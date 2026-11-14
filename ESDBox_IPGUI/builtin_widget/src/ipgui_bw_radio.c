@@ -24,8 +24,6 @@ typedef struct {
     ipgui_bw_radio_cb_t on_change;
 } ipgui_bw_radio_t;
 
-/* -------------------------------------------------------------------------- */
-
 static void bw_rd_copy_label(char * dst, const char * src)
 {
     u32_t i = 0;
@@ -145,8 +143,6 @@ static void bw_rd_render(
     }
 }
 
-/* -------------------------------------------------------------------------- */
-
 static int bw_rd_hit(ipgui_widget_t * widget, ipgui_coord_t x, ipgui_coord_t y)
 {
     return (x >= 0 && y >= 0 && x < widget->w && y < widget->h);
@@ -207,8 +203,6 @@ static void bw_rd_event(
         break;
     }
 }
-
-/* -------------------------------------------------------------------------- */
 
 ipgui_widget_t * ipgui_bw_radio_create(
     ipgui_widget_t * parent,

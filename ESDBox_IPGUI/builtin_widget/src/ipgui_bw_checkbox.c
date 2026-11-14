@@ -24,8 +24,6 @@ typedef struct {
     ipgui_bw_checkbox_cb_t on_change;
 } ipgui_bw_checkbox_t;
 
-/* -------------------------------------------------------------------------- */
-
 static void bw_cb_copy_label(char * dst, const char * src)
 {
     u32_t i = 0;
@@ -152,8 +150,6 @@ static void bw_cb_render(
     }
 }
 
-/* -------------------------------------------------------------------------- */
-
 static int bw_cb_hit(ipgui_widget_t * widget, ipgui_coord_t x, ipgui_coord_t y)
 {
     return (x >= 0 && y >= 0 && x < widget->w && y < widget->h);
@@ -214,8 +210,6 @@ static void bw_cb_event(
         break;
     }
 }
-
-/* -------------------------------------------------------------------------- */
 
 ipgui_widget_t * ipgui_bw_checkbox_create(
     ipgui_widget_t * parent,

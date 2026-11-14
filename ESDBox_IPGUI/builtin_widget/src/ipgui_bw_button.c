@@ -31,8 +31,6 @@ typedef struct {
     ipgui_bw_button_cb_t  on_click;
 } ipgui_bw_button_t;
 
-/* -------------------------------------------------------------------------- */
-
 static void bw_btn_copy_text(char * dst, const char * src)
 {
     u32_t i = 0;
@@ -91,8 +89,6 @@ static ipgui_bw_palette_t bw_btn_palette(ipgui_bw_button_t * b)
 
     return p;
 }
-
-/* -------------------------------------------------------------------------- */
 
 static void bw_btn_render(
     ipgui_widget_t * widget, ipgui_widget_render_ctx_t * ctx)
@@ -206,8 +202,6 @@ static void bw_btn_render(
     }
 }
 
-/* -------------------------------------------------------------------------- */
-
 static int bw_btn_hit(ipgui_widget_t * widget, ipgui_coord_t x, ipgui_coord_t y)
 {
     return (x >= 0 && y >= 0 && x < widget->w && y < widget->h);
@@ -268,8 +262,6 @@ static void bw_btn_event(
         break;
     }
 }
-
-/* -------------------------------------------------------------------------- */
 
 static void bw_btn_setup(ipgui_widget_t * w, const char * text)
 {

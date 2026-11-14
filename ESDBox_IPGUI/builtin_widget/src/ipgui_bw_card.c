@@ -13,8 +13,6 @@ typedef struct {
     u8_t divider;
 } ipgui_bw_card_t;
 
-/* -------------------------------------------------------------------------- */
-
 static void bw_cd_copy(char * dst, u32_t cap, const char * src)
 {
     u32_t i = 0;
@@ -90,8 +88,6 @@ static void bw_cd_render(
             BW_BORDER, 200);
     }
 }
-
-/* -------------------------------------------------------------------------- */
 
 ipgui_widget_t * ipgui_bw_card_create(
     ipgui_widget_t * parent,

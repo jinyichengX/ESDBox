@@ -69,6 +69,10 @@ typedef enum
     // IPGUI_ERR_ANIM_NOT_PAUSED,      /* 动画未处于暂停态 */
     // IPGUI_ERR_ANIM_NOT_RUNNING,     /* 动画未在运行中 */
     // IPGUI_ERR_ANIM_NOT_PAUSED_OR_RUNNING, /* 动画未暂停也未运行 */
+
+    /* 控件业务监听 */
+    IPGUI_ERR_LISTENER_FULL,       /* 该控件监听槽已满 */
+    IPGUI_ERR_LISTENER_NOT_FOUND,  /* 未找到对应监听 */
 }ipgui_err_t;
 
 typedef enum {

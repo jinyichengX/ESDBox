@@ -49,6 +49,16 @@
 #define CORNER_CACHE_ITEM_MAX_NUM 10
 #endif
 
+/* 每个控件预留的业务监听槽数量，0 表示关闭该功能。
+ * 该宏参与 ipgui_widget_t 的布局，必须全工程使用同一个值：
+ * 改这里，或用统一的编译参数覆盖，不要只在某个 .c 里单独定义。 */
+#ifndef IPGUI_WIDGET_LISTENER_MAX
+#define IPGUI_WIDGET_LISTENER_MAX 4
+#endif
+#if IPGUI_WIDGET_LISTENER_MAX > 255
+#error "IPGUI_WIDGET_LISTENER_MAX must be <= 255"
+#endif
+
 /* 输入相关 */
 #define INPUT_SRC_MAX 2
 #if INPUT_SRC_MAX < 1
