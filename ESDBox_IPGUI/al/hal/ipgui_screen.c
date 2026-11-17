@@ -100,7 +100,10 @@ __IPGUI_API__ ipgui_err_t ipgui_scr_create_pfb(
     u32_t valid_size;
     u8_t * pfb_buf = (u8_t *)IPGUI_ALIGN_U32(buf);
     
-    if (pfb_buf >= top_buf) return IPGUI_ERR_NOK;
+    if (pfb_buf >= top_buf) {
+        ipgui_dbg_error("pfb_buf is invalid\n");
+        return IPGUI_ERR_NOK;
+    }
 
     valid_size = top_buf - pfb_buf;
 
@@ -112,7 +115,15 @@ __IPGUI_API__ ipgui_err_t ipgui_scr_create_pfb(
         case PIX_FMT_BGR888:   px_size = 4; break;
         case PIX_FMT_RGBA8888:
         case PIX_FMT_BGRA8888: px_size = 4; break;
-        default: return IPGUI_ERR_INVALID_PFB_PIX_FMT;
+        default: {
+            ipgui_dbg_error("pix_fmt is invalid\n");
+            return IPGUI_ERR_INVALID_PFB_PIX_FMT;
+        }
+    }
+
+    if (px_size > valid_size) {
+        ipgui_dbg_error("pfb size is too small\n");
+        return IPGUI_ERR_PFB_TOO_SMALL;
     }
 
     scr->pfb.num_pixs = valid_size / px_size;

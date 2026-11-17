@@ -124,7 +124,6 @@ __IPGUI_API__ void ipgui_rect_slice_ctx_init(
     ipgui_rect_t         * rect,
     ipgui_coord_t          slice_len)
 {
-    ctx->rect         = rect;
     ctx->remain_w     = rect->end.x - rect->start.x + 1;
     ctx->remain_h     = rect->end.y - rect->start.y + 1;
     ctx->slice_len    = slice_len;
@@ -132,7 +131,6 @@ __IPGUI_API__ void ipgui_rect_slice_ctx_init(
     ctx->full_w       = ctx->remain_w;
     ctx->full_h       = ctx->remain_h;
     ctx->orig_start_x = rect->start.x;
-    ctx->orig_end_x   = rect->end.x;
     ctx->orig_bottom  = rect->end.y + 1;
 
     /*
