@@ -87,16 +87,16 @@ __IPGUI_API__ ipgui_edge_wdf_param_t ipgui_edge_wdf_param_init(
             param.delta_y = (scaled_dy - half_dx) / IPGUI_ABS(param.dx);
         }
 
-        /* 计算修正因子索引 */ 
-        s32_t abs_dx = IPGUI_ABS(param.dx);
-        s32_t abs_dy = param.dy;
+        /* 计算修正因子索引（64 位，避免大坐标下 32 位乘法溢出） */ 
+        s64_t abs_dx = IPGUI_ABS(param.dx);
+        s64_t abs_dy = param.dy;
         param.correction_frac_index = (u8_t)((abs_dy * 126 + (abs_dx >> 1)) / abs_dx);
     } else {
         param.flatten = 0;
         
-        /* 计算修正因子索引 */ 
-        s32_t abs_dx = IPGUI_ABS(param.dx);
-        s32_t abs_dy = param.dy;
+        /* 计算修正因子索引（64 位，避免大坐标下 32 位乘法溢出） */ 
+        s64_t abs_dx = IPGUI_ABS(param.dx);
+        s64_t abs_dy = param.dy;
         param.correction_frac_index = (u8_t)((abs_dx * 126 + (abs_dy >> 1)) / abs_dy);
     }
 
@@ -115,21 +115,23 @@ __IPGUI_API__ ipgui_coord_t ipgui_edge_wdf_x_halfspan(
     ipgui_coord_t x_step = param->x1 + 1;
     ipgui_coord_t x_half_span;
     
-    ipgui_coord_t half_w2 = width >> 1;
+    /* 全部用 64 位计算：线宽或坐标较大时，32 位乘法会溢出，
+     * 导致半跨度退化成 2，粗线会被画成细线 */
+    s64_t half_w2 = width >> 1;
     if (width & 1) half_w2 += 1;/* 这里+1是为了补偿 */
     half_w2 += 1;   /* 这里+1是为了解决边界问题，否则在光栅化平坦线时会有严重的锯齿 */
     half_w2 *= half_w2;
 
-    u32_t a2_plus_b2 = param->a * param->a 
-                     + param->b * param->b;
+    s64_t a2_plus_b2 = (s64_t)param->a * param->a 
+                     + (s64_t)param->b * param->b;
 
     s64_t temp;
     while (1) {
-        temp = param->a * x_step    + 
-               param->b * param->y1 + 
+        temp = (s64_t)param->a * x_step    + 
+               (s64_t)param->b * param->y1 + 
                param->c;
         temp *= temp;
-        if (temp >= ((s64_t)half_w2 * a2_plus_b2)) {
+        if (temp >= half_w2 * a2_plus_b2) {
             x_step ++;
             break;
         }

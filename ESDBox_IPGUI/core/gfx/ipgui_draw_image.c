@@ -31,6 +31,10 @@
 #define IPGUI_FIXED_CEIL(fixed_val) ((fixed_val + IPGUI_FIXED_PRECI - 1) >> IPGUI_FIXED_BITS)
 #endif
 
+/* 单像素临时缓冲大小：插值函数最多写入 4 字节，这里留足余量，
+ * 同时作为 px_size 的上限校验，防止 memcpy 越界读栈 */
+#define IPGUI_IMAGE_CR_BUF_SIZE 10
+
 __IPGUI_STATIC__ __IPGUI_INLINE__ ipgui_scoord_t fixed_mult(ipgui_scoord_t a, ipgui_scoord_t b)
 {
     s8_t sign = 1;
@@ -58,7 +62,12 @@ __IPGUI_STATIC__ __IPGUI_INLINE__ ipgui_scoord_t fixed_div(ipgui_scoord_t a, ipg
     if (b == 0) return 0x7fffffff;  /* 防除零 */
     
     /* 计算：q = ((a << IPGUI_FIXED_BITS) + b/2) / b */
-    q = (ipgui_scoord_t)(((s64_t)a << IPGUI_FIXED_BITS) + (b >> 1)) / b;
+    s64_t q64 = (((s64_t)a << IPGUI_FIXED_BITS) + (b >> 1)) / b;
+
+    /* 退化矩阵（det 接近 0）时商会超出 ipgui_scoord_t 范围，这里饱和处理 */
+    if (q64 >  0x7fffffffLL) q64 =  0x7fffffffLL;
+    if (q64 < -0x7fffffffLL) q64 = -0x7fffffffLL;
+    q = (ipgui_scoord_t)q64;
     
     return (sign > 0) ? q : -q;
 }
@@ -190,6 +199,24 @@ __IPGUI_STATIC__ __IPGUI_INLINE__ u8_t * image_pixmap_get(ipgui_image_data_t * i
     return img_data->pixmap + (img_data->stride * y) + img_data->px_size * x;
 }
 
+/* 像素格式对应的最小每像素字节数，非法格式返回 0 */
+__IPGUI_STATIC__ u8_t image_fmt_px_size(ipgui_image_format_t fmt)
+{
+    switch (fmt) {
+        case IPGUI_IMG_FMT_L8:       return 1;
+        case IPGUI_IMG_FMT_LA88:     return 2;
+        case IPGUI_IMG_FMT_RGB565:
+        case IPGUI_IMG_FMT_BGR565:   return 2;
+        case IPGUI_IMG_FMT_RGB888:
+        case IPGUI_IMG_FMT_BGR888:   return 3;
+        case IPGUI_IMG_FMT_ARGB8888:
+        case IPGUI_IMG_FMT_ABGR8888:
+        case IPGUI_IMG_FMT_RGBA8888:
+        case IPGUI_IMG_FMT_BGRA8888: return 4;
+        default:                     return 0;
+    }
+}
+
 
 /* 根据直觉设计画图片的API
  * 指定一个离屏缓冲表面surf，然后将图钉钉在图片的某个点pivot （也就是给一个二维坐标系的原点，这个坐标系就是图片坐标系）类似于鼠标点住这个点进行拖动，需要注意pivot就是二维坐标系原点
@@ -211,6 +238,21 @@ __IPGUI_API__ void ipgui_draw_image(
         return;
 
     if (style->opacity < 3)
+        return;
+
+    /* 入参合法性检查：非法尺寸/步长/格式都会让采样索引越界 */
+    if ((img_data->w <= 0) || (img_data->h <= 0) || (!img_data->pixmap))
+        return;
+    {
+        u8_t fmt_px_size = image_fmt_px_size(img_data->fmt);
+        if ((fmt_px_size == 0) ||
+            (img_data->px_size < fmt_px_size) ||
+            (img_data->px_size > IPGUI_IMAGE_CR_BUF_SIZE)) {
+            ipgui_dbg_warning("warning: invalid image fmt/px_size\r\n");
+            return;
+        }
+    }
+    if ((s64_t)img_data->stride < ((s64_t)img_data->px_size * img_data->w))
         return;
 
     if (!trans) {
@@ -242,7 +284,7 @@ __IPGUI_API__ void ipgui_draw_image(
 
     /* draw transformed image */
     /* check if matrix is invertible */
-    if (trans->a * trans->d == trans->b * trans->c) {
+    if ((s64_t)trans->a * trans->d == (s64_t)trans->b * trans->c) {
         ipgui_dbg_warning("warning: the transfrom matrix err, because it is 不可逆的\r\n");
         return;
     }
@@ -295,12 +337,14 @@ __IPGUI_API__ void ipgui_draw_image(
     u8_t * cr_a, * cr_b, * cr_c, * cr_d;/* 插值点周围4点颜色值索引 */
     ipgui_coord_t temp_x, temp_y;
     s32_t alpha, d;/* for edge mask */
-    u8_t cr[10];
+    u8_t cr[IPGUI_IMAGE_CR_BUF_SIZE] = {0};
     u32_t hd, vd;
     s32_t idx = 0;
 #define SHIFT (8 - IPGUI_FIXED_BITS)
+    const ipgui_coord_t src_w = img_data->w; /* 源图宽高/行跨度缓存到局部变量，避免热循环反复访存 */
+    const ipgui_coord_t src_h = img_data->h;
+    const u32_t         stride = img_data->stride;
     u32_t px_sz  = img_data->px_size; /* per pixel size */
-    u32_t stride = img_data->stride;
 
     ipgui_scoord_t ori_dx, ori_dy;
     ori_dx = pivot->x * IPGUI_FIXED_PRECI;
@@ -381,8 +425,8 @@ __IPGUI_API__ void ipgui_draw_image(
                     temp_x = IPGUI_FIXED_FLOOR(xo);
                     temp_y = IPGUI_FIXED_FLOOR(yo);
 
-                    if (hd >= 128) temp_x ++;
-                    if (vd >= 128) temp_y ++;
+                    if ((hd >= 128) && (temp_x + 1 < src_w)) temp_x ++;
+                    if ((vd >= 128) && (temp_y + 1 < src_h)) temp_y ++;
                     ipgui_memcpy(pixmap + idx * px_sz, 
                         image_pixmap_get(img_data, temp_x, temp_y), 
                         px_sz);
@@ -401,11 +445,14 @@ __IPGUI_API__ void ipgui_draw_image(
                     temp_x = IPGUI_FIXED_FLOOR(xo);
                     temp_y = IPGUI_FIXED_FLOOR(yo);
 
-                    /* get src color */
+                    /* get src color：右/下邻居越界时偏移退化为 0（等价钳制到当前像素），
+                     * 只对 cr_a 做一次地址计算，避免每个采样点重复乘加寻址 */
+                    u32_t dx = (temp_x + 1 < src_w) ? px_sz : 0;
+                    u32_t dy = (temp_y + 1 < src_h) ? stride : 0;
                     cr_a = image_pixmap_get(img_data, temp_x, temp_y); /* the top left point */
-                    cr_b = cr_a + px_sz;
-                    cr_c = cr_a + stride;
-                    cr_d = cr_c + px_sz;
+                    cr_b = cr_a + dx;
+                    cr_c = cr_a + dy;
+                    cr_d = cr_c + dx;
                     /* lerp */
                     g_pix_lerp[img_data->fmt].bilinear(cr_a, cr_b, cr_c, cr_d, (u8_t)hd, (u8_t)vd, cr);
                     /* write to pixel buffer */
@@ -429,7 +476,7 @@ __IPGUI_API__ void ipgui_draw_image(
                         temp_y = IPGUI_FIXED_FLOOR(yo);
                         /* get src color */
                         cr_a = image_pixmap_get(img_data, temp_x, temp_y);
-                        cr_b = cr_a + stride;
+                        cr_b = cr_a + ((temp_y + 1 < src_h) ? stride : 0);
                         d = (yo - (yo & IPGUI_FIXED_MASK));
                     }
                 } else if (xo > border_x) { /* right edge */
@@ -447,7 +494,7 @@ __IPGUI_API__ void ipgui_draw_image(
                         temp_y = IPGUI_FIXED_FLOOR(yo);
                         /* get src color */
                         cr_a = image_pixmap_get(img_data, temp_x, temp_y);
-                        cr_b = cr_a + stride;
+                        cr_b = cr_a + ((temp_y + 1 < src_h) ? stride : 0);
                         d = (yo - (yo & IPGUI_FIXED_MASK));
                     }
                 } else if (yo < 0) { /* top edge */
@@ -456,7 +503,7 @@ __IPGUI_API__ void ipgui_draw_image(
                     temp_y = IPGUI_FIXED_CEIL(yo);
                     /* get src color */
                     cr_a = image_pixmap_get(img_data, temp_x, temp_y);
-                    cr_b = cr_a + px_sz;
+                    cr_b = cr_a + ((temp_x + 1 < src_w) ? px_sz : 0);
                     d = (xo - (xo & IPGUI_FIXED_MASK));
                 } else if (yo > border_y) { /* bottom edge */
                     alpha = yo - border_y;
@@ -464,7 +511,7 @@ __IPGUI_API__ void ipgui_draw_image(
                     temp_y = IPGUI_FIXED_FLOOR(yo);
                     /* get src color */
                     cr_a = image_pixmap_get(img_data, temp_x, temp_y);
-                    cr_b = cr_a + px_sz;
+                    cr_b = cr_a + ((temp_x + 1 < src_w) ? px_sz : 0);
                     d = (xo - (xo & IPGUI_FIXED_MASK));
                 }
 
@@ -558,6 +605,21 @@ __IPGUI_API__ void ipgui_draw_image_tiled(
     /* 平铺模式下图像尺寸必须 > 0，否则 period=0 会导致取模除零 */
     if ((img_data->w <= 0) || (img_data->h <= 0) || (!img_data->pixmap))
         return;
+    {
+        u8_t fmt_px_size = image_fmt_px_size(img_data->fmt);
+        if ((fmt_px_size == 0) ||
+            (img_data->px_size < fmt_px_size) ||
+            (img_data->px_size > IPGUI_IMAGE_CR_BUF_SIZE)) {
+            ipgui_dbg_warning("warning: invalid image fmt/px_size\r\n");
+            return;
+        }
+    }
+    if ((s64_t)img_data->stride < ((s64_t)img_data->px_size * img_data->w))
+        return;
+    /* period = w * IPGUI_FIXED_PRECI 必须能用 ipgui_scoord_t 表示 */
+    if ((img_data->w > (IPGUI_COORD_MAX / IPGUI_FIXED_PRECI)) ||
+        (img_data->h > (IPGUI_COORD_MAX / IPGUI_FIXED_PRECI)))
+        return;
 
     /* trans 为空时按单位矩阵处理（纯平铺） */
     ipgui_trans_mat_t identity;
@@ -570,7 +632,7 @@ __IPGUI_API__ void ipgui_draw_image_tiled(
     }
 
     /* check if matrix is invertible */
-    if (trans->a * trans->d == trans->b * trans->c) {
+    if ((s64_t)trans->a * trans->d == (s64_t)trans->b * trans->c) {
         ipgui_dbg_warning("warning: the transfrom matrix err, because it is 不可逆的\r\n");
         return;
     }
@@ -649,7 +711,7 @@ __IPGUI_API__ void ipgui_draw_image_tiled(
     ipgui_coord_t x, y;
     ipgui_scoord_t xo, yo;        /* 反向映射得到的源图像定点坐标（已包裹） */
     u32_t idx = 0;
-    u8_t cr[10];
+    u8_t cr[IPGUI_IMAGE_CR_BUF_SIZE] = {0};
     u8_t * cr_a, * cr_b, * cr_c, * cr_d;
     u32_t hd, vd;                 /* 采样点在 a 右侧/下侧的小数距离，缩放到 0-255 */
     ipgui_coord_t temp_x, temp_y;

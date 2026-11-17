@@ -250,11 +250,11 @@ __IPGUI_STATIC__ void ipgui_draw_hor_line(
         circle_style.eep_type = IPGUI_ARC_ENDPOINT_TYPE_BUTT;
         circle_style.opacity  = style->opacity;
         circle_style.paint    = style->paint;
-        ipgui_draw_arc(surf, (ipgui_aabb_t *)0, &circle, &circle_style);
+        ipgui_draw_arc(surf, clip, &circle, &circle_style);
 
         circle.cx = line->end.x;
         circle.cy = line->end.y;
-        ipgui_draw_arc(surf, (ipgui_aabb_t *)0, &circle, &circle_style);
+        ipgui_draw_arc(surf, clip, &circle, &circle_style);
     }
 }
 
@@ -312,11 +312,11 @@ __IPGUI_STATIC__ void ipgui_draw_ver_line(
         circle_style.eep_type = IPGUI_ARC_ENDPOINT_TYPE_BUTT;
         circle_style.opacity  = style->opacity;
         circle_style.paint    = style->paint;
-        ipgui_draw_arc(surf, (ipgui_aabb_t *)0, &circle, &circle_style);
+        ipgui_draw_arc(surf, clip, &circle, &circle_style);
 
         circle.cx = line->end.x;
         circle.cy = line->end.y;
-        ipgui_draw_arc(surf, (ipgui_aabb_t *)0, &circle, &circle_style);
+        ipgui_draw_arc(surf, clip, &circle, &circle_style);
     }
 }
 
@@ -488,11 +488,11 @@ __IPGUI_STATIC__ void ipgui_draw_skew_line(
         circle_style.eep_type = IPGUI_ARC_ENDPOINT_TYPE_BUTT;
         circle_style.opacity  = style->opacity;
         circle_style.paint    = style->paint;
-        ipgui_draw_arc(surf, (ipgui_aabb_t *)0, &circle, &circle_style);
+        ipgui_draw_arc(surf, clip, &circle, &circle_style);
 
         circle.cx = line->end.x;
         circle.cy = line->end.y;
-        ipgui_draw_arc(surf, (ipgui_aabb_t *)0, &circle, &circle_style);
+        ipgui_draw_arc(surf, clip, &circle, &circle_style);
     }
 
     ipgui_mask_buf_free(mask);

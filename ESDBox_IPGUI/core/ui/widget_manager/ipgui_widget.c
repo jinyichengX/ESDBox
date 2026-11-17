@@ -446,3 +446,11 @@ void ipgui_widget_scroll_handler(
         break;
     }
 }
+
+__IPGUI_API__ void ipgui_widget_destroy(ipgui_widget_t * widget)
+{
+    if (!widget) return;
+
+    // ipgui_widget_link_detatch(&widget->link);/* 这句不对 */
+    // ipgui_mem_free_def(widget);
+}

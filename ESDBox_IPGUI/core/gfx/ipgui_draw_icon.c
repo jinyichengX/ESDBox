@@ -56,7 +56,12 @@ __IPGUI_STATIC__ __IPGUI_INLINE__ ipgui_scoord_t fixed_div(ipgui_scoord_t a, ipg
     if (b == 0) return 0x7fffffff;  /* 防除零 */
     
     /* 计算：q = ((a << IPGUI_FIXED_BITS) + b/2) / b */
-    q = (ipgui_scoord_t)(((s64_t)a << IPGUI_FIXED_BITS) + (b >> 1)) / b;
+    s64_t q64 = (((s64_t)a << IPGUI_FIXED_BITS) + (b >> 1)) / b;
+
+    /* 退化矩阵（det 接近 0）时商会超出 ipgui_scoord_t 范围，这里饱和处理 */
+    if (q64 >  0x7fffffffLL) q64 =  0x7fffffffLL;
+    if (q64 < -0x7fffffffLL) q64 = -0x7fffffffLL;
+    q = (ipgui_scoord_t)q64;
     
     return (sign > 0) ? q : -q;
 }
@@ -230,6 +235,10 @@ __IPGUI_API__ void ipgui_draw_icon(
     if (style->opacity < 3)
         return;
 
+    /* 入参合法性检查：宽高必须为正，否则采样索引会为负/越界 */
+    if ((icon_data->w <= 0) || (icon_data->h <= 0))
+        return;
+
     if (!trans) {
         ipgui_aabb_t icon_aabb;
         /* get icon aabb(absolute coordinate on surf) */
@@ -253,8 +262,12 @@ __IPGUI_API__ void ipgui_draw_icon(
     }
 
     /* draw transformed icon */
+    /* 变换路径必须读取 mask，空指针直接返回 */
+    if (!icon_data->mask)
+        return;
+
     /* check if matrix is invertible */
-    if (trans->a * trans->d == trans->b * trans->c) {
+    if ((s64_t)trans->a * trans->d == (s64_t)trans->b * trans->c) {
         ipgui_dbg_warning("warning: the transfrom matrix err, because it is 不可逆的\r\n");
         return;
     }
@@ -262,6 +275,8 @@ __IPGUI_API__ void ipgui_draw_icon(
     ipgui_aabb_t icon_rel_pivot;
     ipgui_aabb_t icon_in_surf;
     ipgui_coord_t icon_w, icon_h;
+    const ipgui_coord_t src_w = icon_data->w; /* 源图标宽高缓存到局部变量，避免热循环反复访存 */
+    const ipgui_coord_t src_h = icon_data->h;
     icon_rel_pivot = ipgui_calc_icon_transformed_aabb_rel_to_pivot(pivot, trans, icon_data->w, icon_data->h);
     icon_w = ipgui_aabb_width (&icon_rel_pivot);
     icon_h = ipgui_aabb_height(&icon_rel_pivot);
@@ -374,11 +389,14 @@ __IPGUI_API__ void ipgui_draw_icon(
                 temp_x = IPGUI_FIXED_FLOOR(xo);
                 temp_y = IPGUI_FIXED_FLOOR(yo);
 
-                /* get src mask */
+                /* get src mask：右/下邻居越界时偏移退化为 0（等价钳制到当前像素），
+                 * 只对 cr_a 做一次地址计算，避免每个采样点重复乘加寻址 */
+                u32_t dx = (temp_x + 1 < src_w) ? 1 : 0;
+                u32_t dy = (temp_y + 1 < src_h) ? (u32_t)src_w : 0;
                 cr_a = icon_mask_get(icon_data, temp_x, temp_y); /* the top left point */
-                cr_b = cr_a + 1;
-                cr_c = cr_a + icon_data->w;
-                cr_d = cr_c + 1;
+                cr_b = cr_a + dx;
+                cr_c = cr_a + dy;
+                cr_d = cr_c + dx;
 
                 /* use src mask to lerp mask */
                 mask_buf[idx++] = biliner_core(*cr_a, *cr_b, *cr_c, *cr_d, (u8_t)hd, (u8_t)vd);
@@ -396,9 +414,9 @@ __IPGUI_API__ void ipgui_draw_icon(
                         alpha = 0 - xo;
                         temp_x = IPGUI_FIXED_CEIL(xo);
                         temp_y = IPGUI_FIXED_FLOOR(yo);
-                        /* get src color */
+                        /* get src color（下一行越界时退化为当前像素） */
                         cr_a = icon_mask_get(icon_data, temp_x, temp_y);
-                        cr_b = cr_a + icon_data->w;
+                        cr_b = cr_a + ((temp_y + 1 < src_h) ? (u32_t)src_w : 0);
                         d = (yo - (yo & IPGUI_FIXED_MASK));
                     }
                 } else if (xo > border_x) { /* right edge */
@@ -414,26 +432,26 @@ __IPGUI_API__ void ipgui_draw_icon(
                         alpha = xo - border_x;
                         temp_x = IPGUI_FIXED_FLOOR(xo);
                         temp_y = IPGUI_FIXED_FLOOR(yo);
-                        /* get src color */
+                        /* get src color（下一行越界时退化为当前像素） */
                         cr_a = icon_mask_get(icon_data, temp_x, temp_y);
-                        cr_b = cr_a + icon_data->w;
+                        cr_b = cr_a + ((temp_y + 1 < src_h) ? (u32_t)src_w : 0);
                         d = (yo - (yo & IPGUI_FIXED_MASK));
                     }
                 } else if (yo < 0) { /* top edge */
                     alpha = 0 - yo;
                     temp_x = IPGUI_FIXED_FLOOR(xo);
                     temp_y = IPGUI_FIXED_CEIL(yo);
-                    /* get src color */
+                    /* get src color（右邻居越界时退化为当前像素） */
                     cr_a = icon_mask_get(icon_data, temp_x, temp_y);
-                    cr_b = cr_a + 1;
+                    cr_b = cr_a + ((temp_x + 1 < src_w) ? 1 : 0);
                     d = (xo - (xo & IPGUI_FIXED_MASK));
                 } else if (yo > border_y) { /* bottom edge */
                     alpha = yo - border_y;
                     temp_x = IPGUI_FIXED_FLOOR(xo);
                     temp_y = IPGUI_FIXED_FLOOR(yo);
-                    /* get src color */
+                    /* get src color（右邻居越界时退化为当前像素） */
                     cr_a = icon_mask_get(icon_data, temp_x, temp_y);
-                    cr_b = cr_a + 1;
+                    cr_b = cr_a + ((temp_x + 1 < src_w) ? 1 : 0);
                     d = (xo - (xo & IPGUI_FIXED_MASK));
                 }
 

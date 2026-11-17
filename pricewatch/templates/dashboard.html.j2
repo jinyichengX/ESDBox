@@ -1,0 +1,54 @@
+{% extends "base.html.j2" %}
+{% block title %}概览 · PriceWatch{% endblock %}
+{% block body %}
+<div class="head">
+  <h1>概览</h1>
+  <a class="btn" href="/stores/new">添加竞品店铺</a>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="v">{{ stats.stores }}</div><div class="k">监控店铺</div></div>
+  <div class="stat"><div class="v">{{ stats.products }}</div><div class="k">在售商品</div></div>
+  <div class="stat"><div class="v">{{ stats.today_events }}</div><div class="k">今日变化</div></div>
+  <div class="stat"><div class="v">{{ stats.price_drops }}</div><div class="k">今日降价</div></div>
+</div>
+
+<h2>监控中的店铺</h2>
+{% if stores %}
+<table class="tbl">
+  <thead>
+    <tr><th>店铺</th><th>平台</th><th>商品</th><th>变化</th><th>上次采集</th><th></th></tr>
+  </thead>
+  <tbody>
+  {% for s in stores %}
+    <tr>
+      <td>
+        <a href="/stores/{{ s.id }}">{{ s.label }}</a>
+        {% if s.last_error %}<div class="err">上次失败：{{ s.last_error }}</div>{% endif %}
+      </td>
+      <td><span class="tag">{{ s.platform }}</span></td>
+      <td class="mono">{{ s.product_count }}</td>
+      <td class="mono">{{ s.event_count }}</td>
+      <td class="dim">{{ ft(s.last_checked_at) if s.last_checked_at else "尚未采集" }}</td>
+      <td class="right">
+        <form method="post" action="/stores/{{ s.id }}/collect" class="inline">
+          <button class="mini" type="submit">立即采集</button>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="empty">
+  还没有监控任何店铺。<a href="/stores/new">添加第一个竞品店铺</a>，之后系统会按间隔自动采集。
+</div>
+{% endif %}
+
+<h2>最近变化</h2>
+{% if events %}
+  {% include "_events.html.j2" %}
+{% else %}
+<div class="empty">暂时没有变化。首次采集只建立基线，从第二次采集开始才会记录价格与库存变动。</div>
+{% endif %}
+{% endblock %}

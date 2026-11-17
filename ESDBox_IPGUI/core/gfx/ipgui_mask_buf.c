@@ -10,7 +10,7 @@ u8_t * ipgui_mask_buf_acquire(
     u8_t * p = (u8_t *)0;
 
     if (w <= 0 || h <= 0 || !res_h) {
-        if (res_h) * res_h = 0;
+        if (res_h) *res_h = 0;
         return (u8_t *)0;
     }
 

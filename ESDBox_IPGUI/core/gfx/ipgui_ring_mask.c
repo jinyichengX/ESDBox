@@ -557,7 +557,7 @@ void print_item_list(void)
 }
 #endif
 
-static void ipgui_fetch_out_corner_mask(
+static ipgui_err_t ipgui_fetch_out_corner_mask(
     ipgui_coord_t x, ipgui_coord_t y, ipgui_coord_t r,
     s8_t step,/* step = 1/-1 */
     u8_t * mask, u16_t len)
@@ -574,18 +574,20 @@ static void ipgui_fetch_out_corner_mask(
             cx = x + (ipgui_coord_t)(step * i);
             mask[i] = tbl[(y - 1) * r + (cx - 1)];
         }
-        return;
+        return IPGUI_ERR_OK;
     }
     if (0 == ipgui_fetch_out_corner_mask_from_cache(x, y, r, step, mask, len))
-        return;
+        return IPGUI_ERR_OK;
 
     /* calculate mask directly */
 #if DEBUG_CORNER_MASK == 1
     ipgui_dbg_error("not support calculate outer mask directly now!!!\r\n");
 #endif
 
+    return IPGUI_ERR_NOK;
 }
 
+/* 成功返回0，失败返回-1 */ 
 int ipgui_fetch_ring_mask(ipgui_coord_t x, ipgui_coord_t y, 
     ipgui_coord_t ir, ipgui_coord_t er,
     s8_t step,/* step = 1/-1 */
@@ -625,8 +627,9 @@ int ipgui_fetch_ring_mask(ipgui_coord_t x, ipgui_coord_t y,
     }
 
     /* fetch outside corner mask */
-    ipgui_fetch_out_corner_mask(x, y, er, step, mask, len);
-
+    if (IPGUI_ERR_OK != ipgui_fetch_out_corner_mask(x, y, er, step, mask, len))
+        return -1;
+    
     if (ir <= 0) return 0;
     
     /* fetch from const table first */
@@ -673,7 +676,7 @@ int ipgui_fetch_ring_mask(ipgui_coord_t x, ipgui_coord_t y,
     ipgui_dbg_error("not support calculate inner mask directly now!!!\r\n");
 #endif
 
-        return 0;
+        return -1;
     }
     cache_item->refcnt ++;
     if (y >= cache_item->dig_mask_start_xy) {

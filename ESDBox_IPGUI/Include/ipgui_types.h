@@ -64,11 +64,6 @@ typedef enum
 
     /* 动画相关 */
     IPGUI_ERR_ANIM_NOT_READY, /* 动画未就绪 */
-    // IPGUI_ERR_ANIM_ALREADY_PAUSED,  /* 动画已是暂停态 */
-    // IPGUI_ERR_ANIM_IS_PAUSED,       /* 动画处于暂停态 */
-    // IPGUI_ERR_ANIM_NOT_PAUSED,      /* 动画未处于暂停态 */
-    // IPGUI_ERR_ANIM_NOT_RUNNING,     /* 动画未在运行中 */
-    // IPGUI_ERR_ANIM_NOT_PAUSED_OR_RUNNING, /* 动画未暂停也未运行 */
 
     /* 控件业务监听 */
     IPGUI_ERR_LISTENER_FULL,       /* 该控件监听槽已满 */

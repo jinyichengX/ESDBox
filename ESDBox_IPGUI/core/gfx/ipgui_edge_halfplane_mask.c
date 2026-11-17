@@ -68,17 +68,17 @@ __IPGUI_API__ ipgui_edge_param_t ipgui_edge_param_init(
             param.delta_y = (scaled_dy - half_dx) / IPGUI_ABS(param.dx);
         }
 
-        /* 计算修正因子索引 */ 
-        s32_t abs_dx = IPGUI_ABS(param.dx);
-        s32_t abs_dy = param.dy;
+        /* 计算修正因子索引（64 位，避免大坐标下 32 位乘法溢出） */ 
+        s64_t abs_dx = IPGUI_ABS(param.dx);
+        s64_t abs_dy = param.dy;
         param.correction_frac_index = (u8_t)((abs_dy * 126 + (abs_dx >> 1)) / abs_dx);
     } else {
         /* a steep edge */
         param.flatten = 0;
 
-        /* 计算修正因子索引 */ 
-        s32_t abs_dx = IPGUI_ABS(param.dx);
-        s32_t abs_dy = param.dy;
+        /* 计算修正因子索引（64 位，避免大坐标下 32 位乘法溢出） */ 
+        s64_t abs_dx = IPGUI_ABS(param.dx);
+        s64_t abs_dy = param.dy;
         param.correction_frac_index = (u8_t)((abs_dx * 126 + (abs_dy >> 1)) / abs_dy);
     }
 
