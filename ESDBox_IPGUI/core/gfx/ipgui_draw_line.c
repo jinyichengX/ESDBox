@@ -20,6 +20,17 @@ __IPGUI_API__ void ipgui_draw_line_classic(
     if (style->paint.type == IPGUI_PAINT_IMAGE)
         return;
 
+    /* 零长度线：Wu 算法会落到 dx_abs == dy_abs == 0，后面除以 dy_abs 直接触发
+     * 整数除零异常。这里按一个像素处理，与 generic 版本的退化行为保持一致。 */
+    if ((line->start.x == line->end.x) && (line->start.y == line->end.y)) {
+        ipgui_aabb_t px;
+        px.start = line->start;
+        px.end   = line->end;
+        ipgui_blend(surf, clip, &px, &style->paint, style->opacity,
+                    (u8_t *)0, (ipgui_aabb_t *)0, style->blend_mode);
+        return;
+    }
+
     ipgui_aabb_t self, draw;
     self.start.x = IPGUI_MIN(line->start.x, line->end.x);
     self.start.y = IPGUI_MIN(line->start.y, line->end.y);

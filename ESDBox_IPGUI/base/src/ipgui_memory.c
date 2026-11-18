@@ -1,5 +1,7 @@
 #include "ipgui_memory.h"
 
+#include <stdlib.h>
+
 /* the global heap */
 u8_t ipgui_memheap[IPGUI_SMEM_SIZE] IPGUI_ST_ALIGN(IPGUI_MEM_ALIGN_SIZE);
 ipgui_mem_t * ipgui_smem = (ipgui_mem_t *)0;
@@ -548,10 +550,10 @@ __IPGUI_API__ void ipgui_mem_usage_statistics_take(u8_t * pubUsg1, u8_t * pubUsg
 
 __IPGUI_API__ void * ipgui_mem_alloc_def(ipgui_mem_unit_type_t size)
 {
-    return ipgui_mem_alloc(ipgui_smem, size);
+    return malloc(size);
 }
 
 __IPGUI_API__ void ipgui_mem_free_def(void * p)
 {
-    ipgui_mem_free(ipgui_smem, p);
+    free(p);
 }

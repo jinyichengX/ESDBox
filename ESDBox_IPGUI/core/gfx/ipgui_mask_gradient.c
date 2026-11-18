@@ -66,6 +66,7 @@ __IPGUI_API__ void ipgui_liner_mask_gradient_init_direct(
     gradient->gradient_vector.y = y_end - y_start;
     gradient->gradient_vec_mod_pow = gradient->gradient_vector.x * gradient->gradient_vector.x;
     gradient->gradient_vec_mod_pow += gradient->gradient_vector.y * gradient->gradient_vector.y;
+    if (gradient->gradient_vec_mod_pow == 0) gradient->gradient_vec_mod_pow = 1;/* 防止0做除数 */
 }
 
 __IPGUI_API__ int ipgui_liner_mask_gradient_add_stop(
@@ -147,6 +148,7 @@ __IPGUI_API__ void ipgui_liner_mask_gradient_apply_to_aabb(
 
     gradient->gradient_vec_mod_pow = gradient->gradient_vector.x * gradient->gradient_vector.x;
     gradient->gradient_vec_mod_pow += gradient->gradient_vector.y * gradient->gradient_vector.y;
+    if (gradient->gradient_vec_mod_pow == 0) gradient->gradient_vec_mod_pow = 1;/* 防止0做除数 */
 }
 
 __IPGUI_STATIC__ __IPGUI_INLINE__ unsigned char liner_first_stop_value(
