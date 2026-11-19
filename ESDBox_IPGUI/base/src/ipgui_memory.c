@@ -226,6 +226,8 @@ __IPGUI_API__ void * ipgui_mem_alloc_align(ipgui_mem_t * pstMem, ipgui_mem_unit_
         return (void *)0;
 	if (align_size % IPGUI_MEM_ALIGN_SIZE)
         return (void *)0;
+	if (align_size & (align_size - 1))     /* must be power of 2, otherwise the mask below is wrong */
+        return (void *)0;
 	
 	if (unaligned_addr == (ipgui_mem_unit_type_t **)0) 
         IPGUI_MEM_DBG_WARNING;
@@ -378,10 +380,6 @@ __IPGUI_API__ void * ipgui_mem_realloc(ipgui_mem_t * pstMem, void * pvFstAddr, i
 	
     ipgui_memcpy(pvNewAddr, pvFstAddr, (nOrgSz < Size) ? nOrgSz : Size);
     ipgui_mem_free(pstMem, pvFstAddr);
-#if 1
-    mem_usage_calc(pstMem);
-    ipgui_dbg_info("ipgui heap usage: %d.%d%%\n", pstMem->bUsageInt, pstMem->bUsageFlo);
-#endif
 
 	return (void *)pvNewAddr;
 }
