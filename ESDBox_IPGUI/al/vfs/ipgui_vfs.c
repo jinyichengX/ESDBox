@@ -368,46 +368,47 @@ __IPGUI_API__ ipgui_err_t ipgui_vfs_drename(ipgui_dir_t * dir, const char * path
 
 __IPGUI_STATIC__  int ipgui_win_fopen(ipgui_fs_ops_t * fs, const char * path, void ** pri_file, ipgui_file_mode_e mode)
 {
-    FILE ** f = (FILE **)IPGUI_FS_MEM_ALLOC(sizeof(FILE *));
-    if( f == NULL )
-        return -1;
+    FILE * f = (FILE *)0;
 
     /* a+是追加可写+可读，fseek对写无效，对读有效 */
     /* a是只可追加写，不可读 */
     switch((int)mode)
     {
         case IPGUI_FILE_MODE_READ:
-            * f = fopen(path, "rb");/* 遇到的坑，mode = "r"会读取不完整，改为"rb"就可以了，why? */
+            f = fopen(path, "rb");/* 遇到的坑，mode = "r"会读取不完整，改为"rb"就可以了，why? */
             break;
         case IPGUI_FILE_MODE_WRITE:
-            * f = fopen(path, "w");
+            f = fopen(path, "w");
             break;
         case IPGUI_FILE_MODE_APPEND_WRITE:
-            * f = fopen(path, "a");
+            f = fopen(path, "a");
             break;
         case IPGUI_FILE_MODE_APPEND_WRITE_AND_READ:
-            * f = fopen(path, "a+");
+            f = fopen(path, "a+");
             break;
         default:
             return -1;
     }
 
-    if( (*f) == (FILE *)0 ){
-        IPGUI_FS_MEM_FREE(f);
+    if (f == (FILE *)0)
         return -1;
-    }
 
-    * pri_file = (void *)(* f);
+    /* 直接把 FILE* 存进 pri_file。
+     * 旧实现先从 IPGUI 堆申请一个 8 字节的 FILE** 壳子：壳子被泄漏，
+     * 而 close 时又把 fopen 返回的 FILE* 当成池块 free —— 这会把池的
+     * 空闲链表写到一个不属于池的地址，整条 free list 直接被踩坏。 */
+    * pri_file = (void *)f;
 
     return 0;
 }
 
 __IPGUI_STATIC__ int ipgui_win_fclose(ipgui_fs_ops_t * fs, void * pri_file)
 {
-    if(!(WINDOW_FCLOSE_OK == fclose((FILE *)pri_file)))
+    if (!pri_file)
         return -1;
-    if (pri_file)
-        IPGUI_FS_MEM_FREE(pri_file);
+    if (!(WINDOW_FCLOSE_OK == fclose((FILE *)pri_file)))
+        return -1;
+    /* pri_file 是 fopen 返回的 FILE*，由 CRT 管理，这里不能再 free */
     return 0;
 }
 

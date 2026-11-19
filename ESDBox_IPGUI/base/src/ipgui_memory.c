@@ -546,23 +546,23 @@ __IPGUI_API__ void ipgui_mem_usage_statistics_take(u8_t * pubUsg1, u8_t * pubUsg
     ipgui_mem_statistics_take( ipgui_smem, 0, 0, 0, pubUsg1, pubUsg2);
 }
 
-// __IPGUI_API__ void * ipgui_mem_alloc_def(ipgui_mem_unit_type_t size)
-// {
-//     return ipgui_mem_alloc(ipgui_smem, size);
-// }
-
-// __IPGUI_API__ void ipgui_mem_free_def(void * p)
-// {
-//     ipgui_mem_free(ipgui_smem, p);
-// }
-
-#include <stdlib.h>
 __IPGUI_API__ void * ipgui_mem_alloc_def(ipgui_mem_unit_type_t size)
 {
-    return malloc( size);
+    return ipgui_mem_alloc(ipgui_smem, size);
 }
 
 __IPGUI_API__ void ipgui_mem_free_def(void * p)
 {
-    free( p);
+    ipgui_mem_free(ipgui_smem, p);
 }
+
+// #include <stdlib.h>
+// __IPGUI_API__ void * ipgui_mem_alloc_def(ipgui_mem_unit_type_t size)
+// {
+//     return malloc(size);
+// }
+
+// __IPGUI_API__ void ipgui_mem_free_def(void * p)
+// {
+//     free(p);
+// }
